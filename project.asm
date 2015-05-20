@@ -25,9 +25,11 @@ colloop:
 	cpi col,4 ; if got to col 4, start scanning again from col 0
 	breq main
 	sts PORTL,cmask ; give the current column low signal 
-	;ldi temp,0xFF
+	
+	
+	;ldi temp,0xFF //debouncing to be added
 
-;delay:
+;delay:                     
 	;dec temp
 	;cpi temp,0
 	;brne delay
