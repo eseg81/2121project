@@ -44,7 +44,7 @@ RSSET:
 	do_lcd_command 0b00001101 ; Cursor on, bar, no blink, lecture notes 35
 	do_lcd_command 0b00000110;set entry mode
 	do_lcd_command 0b00000010;cursorhome
-
+	do_lcd_command 0b00000001;clear display
 main:
 	ldi r17,1;
 	rcall Display_OC
@@ -207,6 +207,8 @@ Display_OC:
 set_to_O:
 	ldi r16,'O'
 	do_lcd_data 
+	pop r16
+	pop r21
 	ret
 
 //a function of moveing the cursor to the right most position
@@ -225,6 +227,22 @@ return_1:
 	pop r21
 	ret	
 	
+Display_Power_Text
+		do_lcd_data 'R'
+	do_lcd_data 'S'
+	do_lcd_data 'e'
+	do_lcd_data 't'
+	do_lcd_data ' '
+	do_lcd_data 'P'
+	do_lcd_data 'o '
+	do_lcd_data 'w'
+	do_lcd_data 'e'
+	do_lcd_data 'r'
+	do_lcd_data '1'
+	do_lcd_data '/'
+	do_lcd_data '2'
+	do_lcd_data '/'
+	do_lcd_data '3'
 .dseg
 Time:
 	.byte 4
