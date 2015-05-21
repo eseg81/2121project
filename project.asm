@@ -6,8 +6,28 @@
 .def temp = r20
 .def temp2 = r22
 .def pattern = r21 ; stores the key pressed 
-.def status = r23 ; this keeps track of current mode, door 
-				  ; open or closed and power level
+.def status = r23 ; bit 0 set when in entry mode, bit 1 set when in running mode
+				  ; bit 2 set when in paused mode, bit 3 set when in finished mode
+				  ; bit 4 set when door open (0 when closed), bit 5 set when power level
+				  ; is 100%, bit 6 set when power is 50% and bit 7 is set when power is 25%
+
+.macro is_digit ; checks if the value in pattern is a digit between 0-9
+	push temp
+	ldi temp, 9
+	cpi @0, 0
+	brlo not_digit
+	cpi temp, @0
+	brlo not_digit
+	sbr temp, 0 
+	bst temp, 0 ; sets the T bit in the SREG if it is a digit
+	rjmp end
+not_digit:
+	cbr temp, 0 ; clears the T bit in the SREG if it is a digit
+	bst temp, 0
+end:
+	pop temp
+.endmacro
+
 
 RESET:
 	ldi temp,high(RAMEND) ; sets up the stack pointer
@@ -16,6 +36,9 @@ RESET:
 	out SPL,temp
 	ldi temp,0xF0 ; set the columns up for output, rows for input
 	sts DDRL,temp
+	clr status
+	sbr status, 0 ; start off in entry mode with door closed
+	
 
 main:
 	clr col
@@ -92,4 +115,49 @@ zero:
 
 continue:
 	mov pattern,temp
-	rjmp main
+	rjmp act_on_input
+
+act_on_input: ; deals with the key entered on the keypad
+	sbrc status, 0 ; deal differently with input depending what mode the microwave is in
+	rjmp in_entry_mode
+	sbrc status, 1
+	rjmp in_running_mode
+	sbrc status, 2
+	rjmp in_paused_mode
+	rjmp in_finished_mode
+
+in_entry_mode:
+	cpi pattern, '*'
+	breq start_running
+	cpi pattern, '#'
+	breq clear_entered
+	cpi pattern, 'A'
+	breq select_power_level
+	is_digit pattern
+	brts entering_time ; the T bit is set if pattern holds a digit
+	jmp main ; if it is none of the above then no operation needs to be done
+
+in_running_mode:
+	cpi pattern, '*'
+	breq add_one_minute
+	cpi pattern, '#'
+	breq pause
+	cpi pattern, 'C'
+	breq add_thirty_seconds
+	cpi pattern, 'D'
+	breq subtract_thirty_seconds
+	jmp main ; if it is none of the above then no operation needs to be done
+
+in_paused_mode:
+	cpi pattern, '*'
+	breq resume_cooking
+	cpi pattern, '#'
+	breq cancel_operation
+	jmp main ; if it is none of the above then no operation needs to be done
+
+in_finished_mode:
+	cpi pattern, '#'
+	breq return_to_entry_mode
+	jmp main ; if it is none of the above then no operation needs to be done
+
+
