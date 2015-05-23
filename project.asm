@@ -3,6 +3,7 @@
 .equ LCD_E = 6
 .equ LCD_RW = 5
 .equ LCD_BE = 4
+.equ LCD_BL = 3;back light
 .equ F_CPU = 16000000
 .equ DELAY_1MS = F_CPU / 4 / 1000 - 4
 .def col = r16 ; stores the current column being scanned
@@ -16,7 +17,7 @@
 				  ; bit 2 set when in paused mode, bit 3 set when in finished mode
 				  ; bit 4 set when door open (0 when closed), bit 5 set when power level
 				  ; is 100%, bit 6 set when power is 50% and bit 7 is set when power is 25%
-
+.def r3 = debouncing;0 when key is pressed 0xFF when key is released(0 by default)
 .macro is_digit ; checks if the value in pattern is a digit between 0-9
 	push temp
 	ldi temp, 9
@@ -57,6 +58,8 @@ end:
 	rcall lcd_wait
 .endmacro
 
+.org 0x0000
+	jmp RESET
 
 RESET:
 	ldi temp,high(RAMEND) ; sets up the stack pointer
@@ -68,9 +71,31 @@ RESET:
 	clr status
 	sbr status, 0 ; start off in entry mode with door closed
 	
+	//set up pwm for motor. use timer3 for output compare match
 	ser temp
-	out DDRF,temp
-	out DDRA,temp
+	out DDRE
+	clr temp
+	out PORTE
+	sts OCR3L,temp
+	sts OCR3H,temp
+	//set up phase correct PWM mode
+	ldi temp, (1 << CS30)
+	sts TCCR3B, temp
+	ldi temp, (1<< WGM30)|(1<<COM3B1)
+	sts TCCR3A, temp
+
+	//set up phase correct PWM mode for back light
+	clr temp
+	sts OCR5L,temp
+	sts OCR5H,temp
+	ldi temp, (1 << CS50)
+	sts TCCR5B, temp
+	ldi temp, (1<< WGM50)|(1<<COM5B1)
+	sts TCCR5A, temp
+	
+	ser temp
+	out DDRF,temp;For keypad
+	out DDRA,temp;For control of the keypad
 	out DDRC,temp;for LED
 	clr temp
 	out PORTF,temp
@@ -81,22 +106,18 @@ RESET:
 	do_lcd_command 0b00000110;set entry mode
 	do_lcd_command 0b00000010;cursorhome
 	do_lcd_command 0b00000001;clear display
+
+	ldi debouncing,0
+	clr temp
+	sei
 main:
 	clr col
 	ldi cmask,0xEF ; start off with column 0 having low signal
 
 colloop:
 	cpi col,4 ; if got to col 4, start scanning again from col 0
-	breq main
+	breq update_character
 	sts PORTL,cmask ; give the current column low signal 
-	
-	
-	;ldi temp,0xFF //debouncing to be added
-
-;delay:                     
-	;dec temp
-	;cpi temp,0
-	;brne delay
 
 	lds temp,PINL ; reads in the signals from PORT L
 	andi temp,0x0F ; isolate the input from the rows
@@ -120,6 +141,13 @@ nextcol:
 	lsl cmask
 	rjmp colloop
 
+update_character:
+	cpi debouncing,1;key was pressed before
+	brne main
+	clr debouncing
+	mov pattern,temp
+	rjmp continue
+
 convert: ; arrives here when a low signal has been found 
 	cpi col, 3 ; if its in col 3 then a letter is pressed
 	breq letters
@@ -132,7 +160,9 @@ convert: ; arrives here when a low signal has been found
 	mov temp, R0 ; which finds out which number
 	inc temp ; is pressed
 	add temp,col
-	rjmp continue
+	
+	ldi debouncing,1;not ready i.e. key is being pressed
+	rjmp main
 
 letters: ; find which letter pressed
 	ldi temp, 'A'
@@ -421,8 +451,8 @@ return_1:
 	pop r21
 	ret	
 	
-Display_Power_Text
-		do_lcd_data 'R'
+Display_Power_Text:
+	do_lcd_data 'R'
 	do_lcd_data 'S'
 	do_lcd_data 'e'
 	do_lcd_data 't'
@@ -438,17 +468,21 @@ Display_Power_Text
 	do_lcd_data '/'
 	do_lcd_data '3'
 
+//use XH:XL as argument(i.e. parameters passed into this function)
 IntToA:
 	push r19
+	push r20
 	push r21;hundred
 	push r22;tens
-	push r23
+	push r23;one
 	ldi r19,'0'
 	clr r21
 	clr r22
 	clr r23
 hundred:
-	cpi r20,100
+	cpi XL,100
+	ldi r20,0
+	cpc XH,r20
 	brsh addHundreds
 	cpi r21,0
 	breq ten
@@ -456,7 +490,7 @@ hundred:
 	add r16,r19;+'0'
 	do_lcd_data
 ten:
-	cpi r20,10
+	cpi XL,10
 	brsh addTens
 	mov r16,r22
 	cpi r21,0
@@ -469,7 +503,7 @@ printingMe:
 	add r16,r19;+'0'
 	do_lcd_data	
 one:
-	cpi r20,1
+	cpi XL,1
 	brsh addOnes
 	mov r16,r23
 	add r16,r19;
@@ -477,22 +511,68 @@ one:
 	pop r23
 	pop r22
 	pop r21
+	pop r20
 	pop r19
 	ret		
-
 addHundreds:
 	inc r21
-	subi r20,100
+	sbiw XH:XL,50
+	sbiw XH:XL,50
 	rjmp hundred	
-
 addTens:
 	inc r22
-	subi r20,10
+	subi XL,10
 	rjmp ten
 addOnes:
 	inc r23
-	subi r20,1
+	subi XL,1
 	rjmp one
+
+//use r24 as paramter passed in this function
+//255:full speed;128:half speed;64:25% speed
+Motor_Spin:
+	push temp
+	sts OCR3L,r24
+	clr temp
+	sts OCR3H,temp
+	pop temp
+	ret
+
+Back_Light_On:
+	push temp
+	ldi temp,255
+	sts OCR5L,temp
+	clr temp
+	sts OCR5H,temp
+	pop temp
+	ret
+
+Back_Light_Off:
+	push temp
+	ldi temp,0
+	sts OCR5L,temp
+	clr temp
+	sts OCR5H,temp
+	pop temp
+	ret
+
+Back_Light_Fade:
+	push temp
+	ldi temp,250
+comparing_intensity:
+	cpi temp,0
+	brsh light
+finished:
+	clr temp
+	sts OCR5H,temp
+	pop temp
+	ret
+light:
+	sts OCR5L,temp
+	dec temp
+	rcall sleep_1ms
+	rcall slee[_1ms
+	rjmp comparing_intensity
 .dseg
 Time:
 	.byte 4
