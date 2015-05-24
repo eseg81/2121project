@@ -245,4 +245,4 @@ Display_Power_Text
 	do_lcd_data '3'
 .dseg
 Time:
-	.byte 4
+	.byte 2

@@ -93,6 +93,7 @@ RESET:
 	ldi temp, (1<< WGM50)|(1<<COM5B1)
 	sts TCCR5A, temp
 	
+	//setup ports for keypad and LED
 	ser temp
 	out DDRF,temp;For keypad
 	out DDRA,temp;For control of the keypad
@@ -107,6 +108,15 @@ RESET:
 	do_lcd_command 0b00000010;cursorhome
 	do_lcd_command 0b00000001;clear display
 
+
+	//information reset
+	clr temp
+	sts Buffer,temp
+	sts Buffer+1,temp
+	sts Time,temp
+	sts Time+1,temp
+	sts Time+2,temp
+	sts Time+3,temp
 	ldi debouncing,0
 	clr temp
 	sei
@@ -336,23 +346,38 @@ sleep_5ms:
 	ret
 
 Display_Finished_Mode:
-	do_lcd_data 'D'
-	do_lcd_data 'O'
-	do_lcd_data 'N'
-	do_lcd_data 'E'
+	ldi r16, 'D'
+	do_lcd_data
+	ldi r16, 'O'
+	do_lcd_data
+	ldi r16, 'N'
+	do_lcd_data
+	ldi r16, 'E'
+	do_lcd_data
 	do_lcd_command 0b11000000 ;cursor second line
 
-	do_lcd_data 'R'
-	do_lcd_data 'e'
-	do_lcd_data 'm'
-	do_lcd_data 'o'
-	do_lcd_data 'v'
-	do_lcd_data 'e'
-	do_lcd_data ' '
-	do_lcd_data 'f'
-	do_lcd_data 'o'
-	do_lcd_data 'o'
-	do_lcd_data 'd'
+	ldi r16, 'R'
+	do_lcd_data
+	ldi r16, 'e'
+	do_lcd_data
+	ldi r16, 'm'
+	do_lcd_data
+	ldi r16, 'o'
+	do_lcd_data
+	ldi r16, 'v'
+	do_lcd_data
+	ldi r16, 'e'
+	do_lcd_data
+	ldi r16, ' '
+	do_lcd_data
+	ldi r16, 'f'
+	do_lcd_data
+	ldi r16, 'o'
+	do_lcd_data
+	ldi r16, 'o'
+	do_lcd_data
+	ldi r16, 'd'
+	do_lcd_data
 	ret
 
 //call this function after setting the r24 to the corresponding 
@@ -400,16 +425,14 @@ Display_Time:
 	push r16
 	push r21
 	do_lcd_command 0b00000010;cursor home
-	lds r16,Time
-	do_lcd_data 
-	lds r16,Time+1
-	do_lcd_data 
+	lds XL,Time
+	lds XH,Time+1
+	rcall IntToA
 	lds r16,':'
 	do_lcd_data 
-	lds r16,Time+2
-	do_lcd_data 
-	lds r16,Time+3
-	do_lcd_data 
+	lds XL,Time+2
+	lds XH,Time+3
+	rcall IntToA
 	pop r21
 	pop r16
 	ret
@@ -439,6 +462,7 @@ set_to_O:
 //on the display with the cursor stays at the beginning of any
 //line 
 move_cursor:
+	push r16
 	push r21
 	ldi r21,15
 moving:
@@ -449,27 +473,47 @@ moving:
 	rjmp moving
 return_1:
 	pop r21
+	popr16
 	ret	
 	
 Display_Power_Text:
-	do_lcd_data 'R'
-	do_lcd_data 'S'
-	do_lcd_data 'e'
-	do_lcd_data 't'
-	do_lcd_data ' '
-	do_lcd_data 'P'
-	do_lcd_data 'o '
-	do_lcd_data 'w'
-	do_lcd_data 'e'
-	do_lcd_data 'r'
-	do_lcd_data '1'
-	do_lcd_data '/'
-	do_lcd_data '2'
-	do_lcd_data '/'
-	do_lcd_data '3'
+	push r16
+	ldi r16,'R'
+	do_lcd_data 
+	ldi r16,'S'
+	do_lcd_data 
+	ldi r16,'e'
+	do_lcd_data 
+	ldi r16,'t'
+	do_lcd_data 
+	ldi r16,' '
+	do_lcd_data 
+	ldi r16,'P'
+	do_lcd_data 
+	ldi r16,'o'
+	do_lcd_data 
+	ldi r16,'w'
+	do_lcd_data 
+	ldi r16,'e'
+	do_lcd_data 
+	ldi r16,'r'
+	do_lcd_data 
+	ldi r16,'1'
+	do_lcd_data 
+	ldi r16,'/'
+	do_lcd_data 
+	ldi r16,'2'
+	do_lcd_data 
+	ldi r16,'/'
+	do_lcd_data 
+	ldi r16,'3'
+	do_lcd_data 
+	pop r16
+	ret
 
 //use XH:XL as argument(i.e. parameters passed into this function)
 IntToA:
+	push r16
 	push r19
 	push r20
 	push r21;hundred
@@ -513,6 +557,7 @@ one:
 	pop r21
 	pop r20
 	pop r19
+	pop r16
 	ret		
 addHundreds:
 	inc r21
@@ -572,7 +617,25 @@ light:
 	dec temp
 	rcall sleep_1ms
 	rcall slee[_1ms
-	rjmp comparing_intensity
+	rjmp comparing_intensityl
+
+Display_Buffer:
+	push r16
+	lds r16,Buffer
+	do_lcd_data
+	lds r16,Buffer+1
+	do_lcd_data
+	ldi r16,':'
+	do_lcd_data
+	lds r16,Buffer+2
+	do_lcd_data
+	lds r16,Buffer+3
+	do_lcd_data
+	pop r16
+	ret
+	
 .dseg
+Buffer:
+	.byte 4;holding the four values entered
 Time:
-	.byte 4
+	.byte 2;format:"xx:xx",minutes:seconds
