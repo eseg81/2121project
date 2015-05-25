@@ -6,6 +6,7 @@
 .equ LCD_BL = 3;back light
 .equ F_CPU = 16000000
 .equ DELAY_1MS = F_CPU / 4 / 1000 - 4
+.def index = r3
 .def col = r16 ; stores the current column being scanned
 .def row = r17 ; stores the current row
 .def cmask = r18 ; column mask used to determine which column to give low signal
@@ -51,8 +52,6 @@ end:
 	rcall lcd_command
 	rcall lcd_wait
 .endmacro
-
-
 .macro do_lcd_data
 	rcall lcd_data
 	rcall lcd_wait
@@ -117,9 +116,13 @@ RESET:
 	sts Time+1,temp
 	sts Time+2,temp
 	sts Time+3,temp
+	
+	ldi temp,0
+	mov index,temp
 	ldi debouncing,0
 	clr temp
 	sei
+
 main:
 	clr col
 	ldi cmask,0xEF ; start off with column 0 having low signal
@@ -177,7 +180,8 @@ convert: ; arrives here when a low signal has been found
 letters: ; find which letter pressed
 	ldi temp, 'A'
 	add temp, row
-	rjmp continue
+	ldi debouncing,1;not ready i.e. key is being pressed
+	rjmp main
 
 symbols_or_0: ; find which symbol pressed, or if 0
 	cpi col, 0 ; col 0 is a star
@@ -185,14 +189,18 @@ symbols_or_0: ; find which symbol pressed, or if 0
 	cpi col, 1 ; col 1 is 0
 	breq zero
 	ldi temp, '#' ; otherwise it is #
-	rjmp continue
+	ldi debouncing,1;not ready i.e. key is being pressed
+	rjmp main
 	
 star:
 	ldi temp, '*'
-	rjmp continue
+	ldi debouncing,1;not ready i.e. key is being pressed
+	rjmp main
 	
 zero:
 	ldi temp, 0		 
+	ldi debouncing,1;not ready i.e. key is being pressed
+	rjmp main
 
 continue:
 	mov pattern,temp
@@ -242,6 +250,10 @@ in_finished_mode:
 	jmp main ; if it is none of the above then no operation needs to be done
 
 
+//haven't finished
+select_power_level:
+	Display_Power_Text
+	
 
 
 
@@ -250,16 +262,40 @@ in_finished_mode:
 
 
 
+	
 
 
 
 
-
-
-
-
-
-
+is_digit pattern:
+	push temp
+	push ZL
+	push ZH
+	clr temp
+	ldi ZL,low(Buffer)
+	ldi ZH,high(Buffer)
+	add ZL,index
+	adc ZLH,temp
+	st Z,pattern
+	inc index
+	cpi index,4
+	brne return3
+	clr index
+return3:
+	pop ZH
+	pop ZL
+	pop temp
+	ret
+	
+clear_entered:
+	push temp
+	clr temp
+	sts Buffer,temp
+	sts Buffer+1,temp
+	sts Buffer+2,temp
+	sts Buffer+3,temp
+	pop temp
+	ret
 
 
 
