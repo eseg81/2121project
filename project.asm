@@ -7,6 +7,7 @@
 .equ F_CPU = 16000000
 .equ DELAY_1MS = F_CPU / 4 / 1000 - 4
 .def index = r3
+.def powe = r4
 .def col = r16 ; stores the current column being scanned
 .def row = r17 ; stores the current row
 .def cmask = r18 ; column mask used to determine which column to give low signal
@@ -16,8 +17,7 @@
 .def pattern = r21 ; stores the key pressed 
 .def status = r23 ; bit 0 set when in entry mode, bit 1 set when in running mode
 				  ; bit 2 set when in paused mode, bit 3 set when in finished mode
-				  ; bit 4 set when door open (0 when closed), bit 5 set when power level
-				  ; is 100%, bit 6 set when power is 50% and bit 7 is set when power is 25%
+				  ; bit 4 set when door open (0 when closed), bit 5 set when in power level
 .def r3 = debouncing;0 when key is pressed 0xFF when key is released(0 by default)
 .macro is_digit ; checks if the value in pattern is a digit between 0-9
 	push temp
@@ -207,6 +207,8 @@ continue:
 	rjmp act_on_input
 
 act_on_input: ; deals with the key entered on the keypad
+   sbrc status,5
+   rjmp in_power_state;go to select power level
 	sbrc status, 0 ; deal differently with input depending what mode the microwave is in
 	rjmp in_entry_mode
 	sbrc status, 1
@@ -221,7 +223,7 @@ in_entry_mode:
 	cpi pattern, '#'
 	breq clear_entered
 	cpi pattern, 'A'
-	breq select_power_level
+	breq power_selection_state
 	is_digit pattern
 	brts entering_time ; the T bit is set if pattern holds a digit
 	jmp main ; if it is none of the above then no operation needs to be done
@@ -250,24 +252,49 @@ in_finished_mode:
 	jmp main ; if it is none of the above then no operation needs to be done
 
 
-//haven't finished
-select_power_level:
+
+
+
+
+
+
+
+
+power_selection_state:
+   push r16
 	Display_Power_Text
+	sbr status,5;setting status to power selection state
+   pop r16
+   ret
+
+in_power_state:
+   push r16
+   cpi pattern,'#'
+   breq exitPowerState
+   cpi pattern,4    
+   brlo p1 ;<4
+   pop r16
+   ret;nvalid input, polling to read next input
+p1:
+   cpi pattern,1 
+   brsh  p2;; >=1
+   pop r16
+   ret;invalid input, polling to read next input
+p2:
+   mov power,pattern
+
+exitPowerState:
+   cbr status,5
+   pop r16
+   ret
+
+
 	
 
 
 
-
-
-
-
-
-	
-
-
-
-
-is_digit pattern:
+digit_process_pattern:
+   push r16
 	push temp
 	push ZL
 	push ZH
@@ -281,10 +308,12 @@ is_digit pattern:
 	cpi index,4
 	brne return3
 	clr index
+   Transfer_To_Time
 return3:
 	pop ZH
 	pop ZL
 	pop temp
+   pop r16
 	ret
 	
 clear_entered:
@@ -294,6 +323,8 @@ clear_entered:
 	sts Buffer+1,temp
 	sts Buffer+2,temp
 	sts Buffer+3,temp
+   sts Time+1,temp
+   sts Time.temp
 	pop temp
 	ret
 
@@ -669,7 +700,34 @@ Display_Buffer:
 	do_lcd_data
 	pop r16
 	ret
-	
+
+
+//Transfer values from Buffer to time in data space
+Transfer_To_Time:
+   push r16
+   push r17
+   push r18
+   push r19
+   ldi r16,10
+   lds r19,Buffer+1
+   lds r18,Buffer
+   mul r19,r16
+   mov r19,r0;
+	add r19,r18
+   sts Time
+   
+   lds r19,Buffer+3
+   lds r18,Buffer+2
+   mul r19,r16
+   mov r19,r0;
+	add r19,r18
+   sts Time+1
+   pop r19
+   pop r18
+   pop r17
+   pop r16
+   ret
+         
 .dseg
 Buffer:
 	.byte 4;holding the four values entered
