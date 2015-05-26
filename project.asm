@@ -7,7 +7,7 @@
 .equ F_CPU = 16000000
 .equ DELAY_1MS = F_CPU / 4 / 1000 - 4
 .def index = r3
-.def powe = r4
+.def power = r4
 .def col = r16 ; stores the current column being scanned
 .def row = r17 ; stores the current row
 .def cmask = r18 ; column mask used to determine which column to give low signal
@@ -162,6 +162,7 @@ update_character:
 	rjmp continue
 
 convert: ; arrives here when a low signal has been found 
+	
 	cpi col, 3 ; if its in col 3 then a letter is pressed
 	breq letters
 
@@ -206,9 +207,9 @@ continue:
 	mov pattern,temp
 	rjmp act_on_input
 
-act_on_input: ; deals with the key entered on the keypad
-   sbrc status,5
-   rjmp in_power_state;go to select power level
+act_on_input: ; deals with the key entered on the keypad	   
+    sbrc status,5
+    rjmp in_power_state ; go to select power level
 	sbrc status, 0 ; deal differently with input depending what mode the microwave is in
 	rjmp in_entry_mode
 	sbrc status, 1
@@ -251,50 +252,99 @@ in_finished_mode:
 	breq return_to_entry_mode
 	jmp main ; if it is none of the above then no operation needs to be done
 
+add_thirty_seconds: ; adds 30 seconds to the cooking time
+	push r20
+	push r21
+	lds r20, Time+1 ; r20 now stores the amount of seconds
+	ldi r21, 30
+	add r20, r21
+	cpi r20, 100 ; maximum number of seconds is 99
+	brge adjust_minute_addition ; need to increment the minutes if it 100 or over
+	sts Time+1, r20 
+	rjmp finished_adding_seconds
+
+adjust_minute_addition:
+	lds r21, Time
+	inc r21
+	sts Time, r21
+	subi r20, 60 ; since a minute is added, there is now 60 less seconds
+	sts Time+1, r20
+
+finished_adding_seconds:
+	pop r21
+	pop r20 
+	jmp main		
+
+subtract_thirty_seconds: ; subtracts 30 seconds from the cooking time
+	push r20
+	push r21
+	push r22
+	lds r20, Time+1
+	lds r21, Time
+	subi r20, 30
+	cpi r20, 1
+	clr r22			  ; if subtracting 30 seconds causes the cooking time to be 0 minutes and 
+	cpc r21, r22	  ; 0 seconds or less then the cooking is finished
+	brlt no_time_left  
+	cpi r20, 0 ; if subtracting 30 seconds leaves greater than or exactly 0 seconds
+	brge load_new_seconds ; then that is simply the new amount of seconds
+	dec r21 ; otherwise need to decrement the minutes and adjust the seconds
+	ldi r22, 30 ; in this case the new seconds is 60- (30 - old amount of seconds)
+	add r22, r20
+	sts Time+1, r22
+	rjmp finished_subtracting_seconds
+		
+load_new_seconds:
+	sts Time+1, r20
+	rjmp finished_subtracting_seconds
+
+no_time_left:
+	cbr status, 1 ; leaving running mode
+	sbr status, 3 ; entering finished mode
+	rcall Display_Finished_Mode
+
+finished_subtracting_seconds:
+	pop r22
+	pop r21
+	pop r20
+	jmp main
 
 
-
-
-
-
-
-
-
-power_selection_state:
-   push r16
+power_selection_state:	   
+    push r16
 	Display_Power_Text
-	sbr status,5;setting status to power selection state
-   pop r16
-   ret
+	sbr status, 5 ; setting status to power selection state
+    pop r16
+    ret
 
 in_power_state:
-   push r16
-   cpi pattern,'#'
-   breq exitPowerState
-   cpi pattern,4    
-   brlo p1 ;<4
-   pop r16
-   ret;nvalid input, polling to read next input
+    push r16
+    cpi pattern, '#'
+    breq exitPowerState
+    cpi pattern, 4    
+    brlo p1 ; less than 4
+    pop r16
+    ret ; invalid input, polling to read next input
 p1:
-   cpi pattern,1 
-   brsh  p2;; >=1
-   pop r16
-   ret;invalid input, polling to read next input
+    cpi pattern, 1 
+    brsh p2 ; greater than or equal to 1
+    pop r16
+    ret ; invalid input, polling to read next input
 p2:
-   mov power,pattern
+    mov power,pattern
 
 exitPowerState:
-   cbr status,5
-   pop r16
-   ret
+    cbr status,5
+    pop r16
+    ret
 
 
 	
 
 
 
-digit_process_pattern:
-   push r16
+digit_process_pattern:	   
+    push r16
 	push temp
 	push ZL
 	push ZH
@@ -308,12 +358,12 @@ digit_process_pattern:
 	cpi index,4
 	brne return3
 	clr index
-   Transfer_To_Time
+    Transfer_To_Time
 return3:
 	pop ZH
 	pop ZL
 	pop temp
-   pop r16
+    pop r16
 	ret
 	
 clear_entered:
@@ -323,8 +373,8 @@ clear_entered:
 	sts Buffer+1,temp
 	sts Buffer+2,temp
 	sts Buffer+3,temp
-   sts Time+1,temp
-   sts Time.temp
+    sts Time+1,temp
+    sts Time.temp
 	pop temp
 	ret
 
@@ -361,7 +411,7 @@ lcd_command:
 	lcd_clr LCD_E
 	rcall sleep_1ms
 	ret
-
+	
 lcd_data:
 	out PORTF,r16
 	lcd_set LCD_RS
@@ -375,7 +425,7 @@ lcd_data:
 
 lcd_wait:
 	push r16
-	clr r16;changing portF to input port
+	clr r16 ; changing portF to input port
 	out PORTF,r16
 	lcd_set LCD_RW
 lcd_wait_loop:
@@ -421,7 +471,7 @@ Display_Finished_Mode:
 	do_lcd_data
 	ldi r16, 'E'
 	do_lcd_data
-	do_lcd_command 0b11000000 ;cursor second line
+	do_lcd_command 0b11000000 ; cursor second line
 
 	ldi r16, 'R'
 	do_lcd_data
@@ -452,7 +502,7 @@ Display_Finished_Mode:
 Display_Turntable:
 	push r16
 	push r21
-	do_lcd_command 0b00000010;cursor home
+	do_lcd_command 0b00000010 ; cursor home
 	rcall move_cursor
 	cpi r24,0;0=-
 	breq display_0
@@ -702,34 +752,34 @@ Display_Buffer:
 	ret
 
 
-//Transfer values from Buffer to time in data space
+//Transfer values from Buffer to Time in data space
 Transfer_To_Time:
-   push r16
-   push r17
-   push r18
-   push r19
-   ldi r16,10
-   lds r19,Buffer+1
-   lds r18,Buffer
-   mul r19,r16
-   mov r19,r0;
+	push r16
+	push r17
+    push r18
+    push r19
+    ldi r16,10
+    lds r19,Buffer+1
+    lds r18,Buffer
+    mul r19,r16
+    mov r19,r0;
 	add r19,r18
-   sts Time
+    sts Time
    
-   lds r19,Buffer+3
-   lds r18,Buffer+2
-   mul r19,r16
-   mov r19,r0;
+    lds r19,Buffer+3
+    lds r18,Buffer+2
+    mul r19,r16
+    mov r19,r0;
 	add r19,r18
-   sts Time+1
-   pop r19
-   pop r18
-   pop r17
-   pop r16
-   ret
-         
+    sts Time+1
+    pop r19
+    pop r18
+    pop r17
+    pop r16
+    ret
+	         
 .dseg
 Buffer:
-	.byte 4;holding the four values entered
+	.byte 4 ; holding the four values entered
 Time:
-	.byte 2;format:"xx:xx",minutes:seconds
+	.byte 2 ; format:"xx:xx",minutes:seconds
