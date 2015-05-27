@@ -59,6 +59,8 @@ end:
 
 .org 0x0000
 	jmp RESET
+.org OVF0addr ; timer interrupt
+	jmp TIMER_OVF0
 
 RESET:
 	ldi temp,high(RAMEND) ; sets up the stack pointer
@@ -107,6 +109,13 @@ RESET:
 	do_lcd_command 0b00000010;cursorhome
 	do_lcd_command 0b00000001;clear display
 
+	// setting up the timer interrupt every 128us
+	ldi temp, 0b00000000
+	out TCCR0A, temp 
+	ldi temp, 0b00000010
+	out TCCR0B, temp
+	ldi temp, 1<<TOIE0 
+	sts TIMSK0, temp 
 
 	//information reset
 	clr temp
@@ -543,12 +552,12 @@ Display_Time:
 	push r21
 	do_lcd_command 0b00000010;cursor home
 	lds XL,Time
-	lds XH,Time+1
+	clr XH
 	rcall IntToA
 	lds r16,':'
 	do_lcd_data 
-	lds XL,Time+2
-	lds XH,Time+3
+	lds XL,Time+1
+	clr XH
 	rcall IntToA
 	pop r21
 	pop r16
@@ -575,7 +584,7 @@ set_to_O:
 	pop r21
 	ret
 
-//a function of moveing the cursor to the right most position
+//a function of moving the cursor to the right most position
 //on the display with the cursor stays at the beginning of any
 //line 
 move_cursor:
@@ -690,7 +699,7 @@ addOnes:
 	subi XL,1
 	rjmp one
 
-//use r24 as paramter passed in this function
+//use r24 as parameter passed in this function
 //255:full speed;128:half speed;64:25% speed
 Motor_Spin:
 	push temp
@@ -733,7 +742,7 @@ light:
 	sts OCR5L,temp
 	dec temp
 	rcall sleep_1ms
-	rcall slee[_1ms
+	rcall sleep_1ms
 	rjmp comparing_intensityl
 
 Display_Buffer:
@@ -777,9 +786,99 @@ Transfer_To_Time:
     pop r17
     pop r16
     ret
-	         
+
+TIMER_OVF0:
+	sbrs status, 1 ; if not in running mode then just return
+	reti
+	push r24
+	push r26
+	push r27
+	push temp
+	lds r26, Timecounter 
+	lds r27, Timecounter+1
+	adiw 27:26, 1
+	cpi r26, low(1953) ; this is a 250ms
+	ldi temp, high(1953)
+	cpc r27, temp
+	breq quarter_second
+	cpi r26, low(3906) ; this is 500ms
+	ldi temp, high(3906)
+	cpc r27, temp
+	breq half_second
+	cpi r26, low(7812) ; this is 1s
+	ldi temp, high(7812)
+	cpc r27, temp
+	breq one_second
+	rjmp finish_timer_interrupt ; if it not 250ms, 500ms or 1s don't do anything
+
+quarter_second:
+	cpi power, 3 ; if in power mode 3, then the motor should only run for 250ms
+	brne finish_timer
+	ldi r24, 0 ; so shut it off now
+	rcall Motor_Spin
+	rjmp finish_timer_interrupt
+
+half_second:
+	cpi power, 2 ; if in power mode 2, then the motor should only for 500ms
+	brne finisher_timer
+	ldi r24, 0 ; so shut off now
+	rcall Motor_Spin
+	rjmp finish_timer_interrupt
+
+one_second:
+	rcall one_second_less ; the timer has one second less
+	Display_Time
+	ldi r24, 255 ; all power modes the motor starts off spinning
+	rcall Motor_Spin
+	clr r26
+	clr r27
+
+finish_timer_interrupt:
+	sts Timecounter, r26
+	sts Timecounter+1, r27
+	pop temp
+	pop r27
+	pop r26
+	pop r24
+	reti
+
+one_second_less:
+	push r26
+	push r27
+	push temp
+	lds r26, Time+1 ; this is the seconds in the timer
+	lds r27, Time ; this is the minutes
+	cpi r26, 0 ; if the timer has 0 seconds and 0 minutes then the cooking is over
+	ldi temp, 0
+	cpc r27, temp
+	breq cooking_finished
+	cpi r26, 0 ; if there are 0 seconds then the timer has now 59 seconds and one minute less
+	breq one_minute_less
+	dec r26 ; otherwise just decrease the seconds
+	rjmp finish_one_second_less
+
+one_minute_less:
+	dec r27
+	ldi r26, 59
+	rjmp finish_one_second_less
+
+cooking_finished:
+	cbr status, 1 ; running mode is over
+	sbr status, 3 ; now in finished mode
+	rcall Display_Finished_Mode
+
+finish_one_second_less:
+	sts Time+1, r26
+	sts Time, r27
+	pop temp
+	pop r27
+	pop r26
+	ret	         
+
 .dseg
 Buffer:
 	.byte 4 ; holding the four values entered
 Time:
 	.byte 2 ; format:"xx:xx",minutes:seconds
+Timecounter:
+	.byte 2 ; storing the amount of timer interrupts
