@@ -18,7 +18,7 @@
 .def status = r23 ; bit 0 set when in entry mode, bit 1 set when in running mode
 				  ; bit 2 set when in paused mode, bit 3 set when in finished mode
 				  ; bit 4 set when door open (0 when closed), bit 5 set when in power level
-.def r3 = debouncing;0 when key is pressed 0xFF when key is released(0 by default)
+.def debouncing = r13;0 when key is pressed 0xFF when key is released(0 by default)
 .macro is_digit ; checks if the value in pattern is a digit between 0-9
 	push temp
 	ldi temp, 9
@@ -61,6 +61,10 @@ end:
 	jmp RESET
 .org OVF0addr ; timer interrupt
 	jmp TIMER_OVF0
+.org INT0addr
+	jmp EXIT_INT0
+.org INT1addr
+	jmp EXIT_INT1
 
 RESET:
 	ldi temp,high(RAMEND) ; sets up the stack pointer
@@ -599,7 +603,7 @@ moving:
 	rjmp moving
 return_1:
 	pop r21
-	popr16
+	pop r16
 	ret	
 	
 Display_Power_Text:
@@ -654,8 +658,6 @@ hundred:
 	ldi r20,0
 	cpc XH,r20
 	brsh addHundreds
-	cpi r21,0
-	breq ten
 	mov r16,r21
 	add r16,r19;+'0'
 	do_lcd_data
@@ -663,13 +665,6 @@ ten:
 	cpi XL,10
 	brsh addTens
 	mov r16,r22
-	cpi r21,0
-	breq checkingMe
-	rjmp printingMe
-checkingMe:
-	cpi r22,0
-	breq one
-printingMe:
 	add r16,r19;+'0'
 	do_lcd_data	
 one:
@@ -684,7 +679,8 @@ one:
 	pop r20
 	pop r19
 	pop r16
-	ret		
+	ret	
+	
 addHundreds:
 	inc r21
 	sbiw XH:XL,50
@@ -698,6 +694,7 @@ addOnes:
 	inc r23
 	subi XL,1
 	rjmp one
+
 
 //use r24 as parameter passed in this function
 //255:full speed;128:half speed;64:25% speed
@@ -796,7 +793,7 @@ TIMER_OVF0:
 	push temp
 	lds r26, Timecounter 
 	lds r27, Timecounter+1
-	adiw 27:26, 1
+	adiw r27:r26, 1
 	cpi r26, low(1953) ; this is a 250ms
 	ldi temp, high(1953)
 	cpc r27, temp
@@ -874,6 +871,78 @@ finish_one_second_less:
 	pop r27
 	pop r26
 	ret	         
+
+EXIT_INT0:
+	push r18
+	push r24
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	in r18,EIFR;clearing bouncing
+	cbr r18,0
+	out EIFR,r18
+	ldi r24, 0
+	rcall Display_OC
+	sbr status, 4 ; the door is open
+	sbrc status, 1 ; if in running mode then pause
+	rjmp enter_pause
+	sbrc status, 3
+	rjmp enter_entry
+	rjmp return_from_push
+
+enter_pause:
+	cbr status, 1 
+	sbr status, 2 ; entering pause mode
+	rjmp return_from_push
+
+enter_entry:
+	cbr status, 3
+	sbr status, 0 ; entering entry mode	
+	rjmp return_from_push	
+
+EXIT_INT1:
+	push r18
+	push r24
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	rcall sleep_5ms
+	in r18,EIFR;clearing bouncing
+	cbr r18,1
+	out EIFR,r18
+	cbr status, 4 ; the door is closed
+	ldi r24, 1
+	rcall Display_OC
+
+return_from_push:
+	pop r24
+	pop r18
+	reti
 
 .dseg
 Buffer:
