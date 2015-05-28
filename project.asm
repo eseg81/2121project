@@ -373,13 +373,14 @@ entering_time:
 	cp index,r17
 	brne return3
 	clr index
-    Transfer_To_Time
+   Transfer_To_Time
 return3:
+   Display_Buffer
 	pop ZH
 	pop ZL
 	pop temp
    pop r17
-    pop r16
+   pop r16
 	ret
 	
 clear_entered:
