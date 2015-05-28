@@ -356,11 +356,13 @@ exitPowerState:
 
 
 
-digit_process_pattern:	   
+entering_time:	   
     push r16
+   push r17
 	push temp
 	push ZL
 	push ZH
+   ldi r17,4
 	clr temp
 	ldi ZL,low(Buffer)
 	ldi ZH,high(Buffer)
@@ -368,7 +370,7 @@ digit_process_pattern:
 	adc ZLH,temp
 	st Z,pattern
 	inc index
-	cpi index,4
+	cp index,r17
 	brne return3
 	clr index
     Transfer_To_Time
@@ -376,6 +378,7 @@ return3:
 	pop ZH
 	pop ZL
 	pop temp
+   pop r17
     pop r16
 	ret
 	
@@ -387,7 +390,7 @@ clear_entered:
 	sts Buffer+2,temp
 	sts Buffer+3,temp
     sts Time+1,temp
-    sts Time.temp
+   sts Time.temp
 	pop temp
 	ret
 
