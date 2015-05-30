@@ -62,12 +62,12 @@ end:
 
 .org 0x0000
 	jmp RESET
-.org OVF0addr ; timer interrupt
-	jmp TIMER_OVF0
 .org INT0addr
 	jmp EXIT_INT0
 .org INT1addr
 	jmp EXIT_INT1
+.org OVF0addr ; timer interrupt
+	jmp TIMER_OVF0
 
 RESET:
 	ldi temp,high(RAMEND) ; sets up the stack pointer
@@ -81,11 +81,11 @@ RESET:
 	
 	//set up pwm for motor. use timer3 for output compare match
 	ser temp
-	out DDRE
+	out DDRE,temp
 	clr temp
-	out PORTE
-	sts OCR3L,temp
-	sts OCR3H,temp
+	out PORTE,temp
+	sts OCR3BL,temp
+	sts OCR3BH,temp
 	//set up phase correct PWM mode
 	ldi temp, (1 << CS30)
 	sts TCCR3B, temp
@@ -94,8 +94,8 @@ RESET:
 
 	//set up phase correct PWM mode for back light
 	clr temp
-	sts OCR5L,temp
-	sts OCR5H,temp
+	sts OCR5BL,temp
+	sts OCR5BH,temp
 	ldi temp, (1 << CS50)
 	sts TCCR5B, temp
 	ldi temp, (1<< WGM50)|(1<<COM5B1)
@@ -239,6 +239,7 @@ in_entry_mode:
 	cpi pattern, '*'
 	breq start_running
 	cpi pattern, '#'
+calling_clear_entered:
 	breq clear_entered
 	cpi pattern, 'A'
 	breq power_selection_state
@@ -371,7 +372,7 @@ entering_time:
 	ldi ZL,low(Buffer)
 	ldi ZH,high(Buffer)
 	add ZL,index
-	adc ZLH,temp
+	adc ZH,temp
 	st Z,pattern
 	inc index
 	cp index,r17
@@ -404,9 +405,9 @@ clear_entered:
 	sts Buffer+2,temp
 	sts Buffer+3,temp
     sts Time+1,temp
-    sts Time.temp
+    sts Time,temp
 	pop temp
-	ret
+	rjmp calling_clear_entered
 	
 
 
@@ -718,27 +719,27 @@ addOnes:
 //255:full speed;128:half speed;64:25% speed
 Motor_Spin:
 	push temp
-	sts OCR3L,r24
+	sts OCR3BL,r24
 	clr temp
-	sts OCR3H,temp
+	sts OCR3BH,temp
 	pop temp
 	ret
 
 Back_Light_On:
 	push temp
 	ldi temp,255
-	sts OCR5L,temp
+	sts OCR5BL,temp
 	clr temp
-	sts OCR5H,temp
+	sts OCR5BH,temp
 	pop temp
 	ret
 
 Back_Light_Off:
 	push temp
 	ldi temp,0
-	sts OCR5L,temp
+	sts OCR5BL,temp
 	clr temp
-	sts OCR5H,temp
+	sts OCR5BH,temp
 	pop temp
 	ret
 
@@ -750,15 +751,15 @@ comparing_intensity:
 	brsh light
 finished:
 	clr temp
-	sts OCR5H,temp
+	sts OCR5BH,temp
 	pop temp
 	ret
 light:
-	sts OCR5L,temp
+	sts OCR5BL,temp
 	dec temp
 	rcall sleep_1ms
 	rcall sleep_1ms
-	rjmp comparing_intensityl
+	rjmp comparing_intensity
 
 Display_Buffer:
 	push r16
@@ -788,14 +789,14 @@ Transfer_To_Time:
     mul r19,r16
     mov r19,r0;
 	add r19,r18
-    sts Time
+    sts Time,r19
    
     lds r19,Buffer+3
     lds r18,Buffer+2
     mul r19,r16
     mov r19,r0;
 	add r19,r18
-    sts Time+1
+    sts Time+1,r19
     pop r19
     pop r18
     pop r17
