@@ -18,7 +18,10 @@
 .def status = r23 ; bit 0 set when in entry mode, bit 1 set when in running mode
 				  ; bit 2 set when in paused mode, bit 3 set when in finished mode
 				  ; bit 4 set when door open (0 when closed), bit 5 set when in power level
+				  ; bit 6 set when the turntable rotates clockwise, 0 anticlockwise
 .def debouncing = r13;0 when key is pressed 0xFF when key is released(0 by default)
+.def last_turntable_char = r25
+
 .macro is_digit ; checks if the value in pattern is a digit between 0-9
 	push temp
 	ldi temp, 9
@@ -125,10 +128,11 @@ RESET:
 	clr temp
 	sts Buffer,temp
 	sts Buffer+1,temp
+	sts Buffer+2, temp
+	sts Buffer+3, temp
 	sts Time,temp
 	sts Time+1,temp
-	sts Time+2,temp
-	sts Time+3,temp
+	sts Halfseconds, temp
 	
 	ldi temp,0
 	mov index,temp
@@ -325,7 +329,7 @@ finished_subtracting_seconds:
 
 power_selection_state:	   
     push r16
-	Display_Power_Text
+	rcall Display_Power_Text
 	sbr status, 5 ; setting status to power selection state
     pop r16
     ret
@@ -357,12 +361,12 @@ exitPowerState:
 
 
 entering_time:	   
-    push r16
-   push r17
+	push r16
+    push r17
 	push temp
 	push ZL
 	push ZH
-   ldi r17,4
+    ldi r17,4
 	clr temp
 	ldi ZL,low(Buffer)
 	ldi ZH,high(Buffer)
@@ -373,15 +377,24 @@ entering_time:
 	cp index,r17
 	brne return3
 	clr index
-   Transfer_To_Time
+	rcall Transfer_To_Time
 return3:
-   Display_Buffer
+	rcall Display_Buffer
 	pop ZH
 	pop ZL
 	pop temp
-   pop r17
-   pop r16
+    pop r17
+    pop r16
 	ret
+
+start_running:
+	push temp
+	cbr status, 0 ; leave entry mode
+	sbr status, 1 ; now in running mode
+	ldi temp, 0b01000000 ; if the turntable rotated clockwise last then
+	eor status, temp ; it rotates anticlockwise now, otherwise it rotates clockwise
+	pop temp
+	rjmp main
 	
 clear_entered:
 	push temp
@@ -391,10 +404,10 @@ clear_entered:
 	sts Buffer+2,temp
 	sts Buffer+3,temp
     sts Time+1,temp
-   sts Time.temp
+    sts Time.temp
 	pop temp
 	ret
-
+	
 
 
 
@@ -515,12 +528,13 @@ Display_Finished_Mode:
 	ret
 
 //call this function after setting the r24 to the corresponding 
-//value of the turntabel you want
+//value of the turntable you want
 Display_Turntable:
 	push r16
 	push r21
 	do_lcd_command 0b00000010 ; cursor home
 	rcall move_cursor
+	ldi last_turntable_char, r24
 	cpi r24,0;0=-
 	breq display_0
 	cpi r24,1;1=\
@@ -824,11 +838,22 @@ half_second:
 	brne finisher_timer
 	ldi r24, 0 ; so shut off now
 	rcall Motor_Spin
+	lds temp, Halfseconds ; update the amount of half seconds
+	inc temp
+	cpi temp, 5 ; if there has been 5 half seconds
+	breq five_halfseconds ; then the turntable rotates
+	sts Halfseconds, temp
+	rjmp finish_timer_interrupt
+
+five_halfseconds:
+	clr temp ; start a new round of half seconds
+	sts Halfseconds, temp
+	rcall rotate_turntable
 	rjmp finish_timer_interrupt
 
 one_second:
 	rcall one_second_less ; the timer has one second less
-	Display_Time
+	rcall Display_Time
 	ldi r24, 255 ; all power modes the motor starts off spinning
 	rcall Motor_Spin
 	clr r26
@@ -875,6 +900,53 @@ finish_one_second_less:
 	pop r27
 	pop r26
 	ret	         
+
+rotate_turntable:
+	push r24
+	sbrs status, 6 ; set if the turntable rotates clockwise
+	rjmp anti_clockwise
+	cpi last_turntable_char, 0
+	breq now_1
+	cpi last_turntable_char, 1
+	breq now_2
+	cpi last_turntable_char, 2
+	breq now_3
+	cpi last_turntable_char, 3
+	breq now_0
+
+anti_clockwise:
+	cpi last_turntable_char, 0
+	breq now_3
+	cpi last_turntable_char, 1
+	breq now_0
+	cpi last_turntable_char, 2
+	breq now_1
+	cpi last_turntable_char, 3
+	breq now_2
+
+now_0:
+	ldi r24, 0
+	rjmp finish_rotating
+
+now_1:
+	ldi r24, 1
+	rjmp finish_rotating
+
+now_2:
+	ldi r24, 2
+	rjmp finish_rotating
+
+now_3:
+	ldi r24, 3
+
+finish_rotating:
+	rcall Display_Turntable
+	pop r24
+	ret
+
+
+
+
 
 EXIT_INT0:
 	push r18
@@ -955,3 +1027,5 @@ Time:
 	.byte 2 ; format:"xx:xx",minutes:seconds
 Timecounter:
 	.byte 2 ; storing the amount of timer interrupts
+Halfseconds:
+	.byte 1
