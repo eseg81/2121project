@@ -7,7 +7,7 @@
 .equ F_CPU = 16000000
 .equ DELAY_1MS = F_CPU / 4 / 1000 - 4
 .def index = r3
-.def power = r4
+.def power = r27
 .def col = r16 ; stores the current column being scanned
 .def row = r17 ; stores the current row
 .def cmask = r18 ; column mask used to determine which column to give low signal
@@ -19,7 +19,7 @@
 				  ; bit 2 set when in paused mode, bit 3 set when in finished mode
 				  ; bit 4 set when door open (0 when closed), bit 5 set when in power level
 				  ; bit 6 set when the turntable rotates clockwise, 0 anticlockwise
-.def debouncing = r13;0 when key is pressed 0xFF when key is released(0 by default)
+.def debouncing = r26;0 when key is pressed 0xFF when key is released(0 by default)
 .def last_turntable_char = r25
 
 .macro is_digit ; checks if the value in pattern is a digit between 0-9
@@ -27,7 +27,7 @@
 	ldi temp, 9
 	cpi @0, 0
 	brlo not_digit
-	cpi temp, @0
+	cp temp, @0
 	brlo not_digit
 	sbr temp, 0 
 	bst temp, 0 ; sets the T bit in the SREG if it is a digit
@@ -269,6 +269,39 @@ in_finished_mode:
 	cpi pattern, '#'
 	breq return_to_entry_mode
 	jmp main ; if it is none of the above then no operation needs to be done
+
+cancel_operation:
+	push r20
+	clr r20
+	sts Buffer, r20
+	sts Buffer+1, r21
+	do_lcd_command 0b00000010;cursorhome
+	do_lcd_command 0b00000001;clear display
+	pop r20
+	rjmp main
+
+pause:
+	cbr status, 1 ; leave running mode
+	sbr status, 2 ; enter paused mode
+	rjmp main
+
+return_to_entry_mode:
+	cbr status, 3 ; leave finished mode
+	sbr status, 0 ; enter entry mode
+	rjmp main
+
+resume_cooking:
+	cbr status, 2 ; leave paused mode
+	sbr status, 1 ; enter running mode
+	rjmp main
+
+add_one_minute:
+	push r20
+	lds r20, Time
+	inc r20
+	sts Time, r20
+	pop r20
+	rjmp main
 
 add_thirty_seconds: ; adds 30 seconds to the cooking time
 	push r20
@@ -535,7 +568,7 @@ Display_Turntable:
 	push r21
 	do_lcd_command 0b00000010 ; cursor home
 	rcall move_cursor
-	ldi last_turntable_char, r24
+	mov last_turntable_char, r24
 	cpi r24,0;0=-
 	breq display_0
 	cpi r24,1;1=\
@@ -829,14 +862,14 @@ TIMER_OVF0:
 
 quarter_second:
 	cpi power, 3 ; if in power mode 3, then the motor should only run for 250ms
-	brne finish_timer
+	brne finish_timer_interrupt
 	ldi r24, 0 ; so shut it off now
 	rcall Motor_Spin
 	rjmp finish_timer_interrupt
 
 half_second:
 	cpi power, 2 ; if in power mode 2, then the motor should only for 500ms
-	brne finisher_timer
+	brne finish_timer_interrupt
 	ldi r24, 0 ; so shut off now
 	rcall Motor_Spin
 	lds temp, Halfseconds ; update the amount of half seconds
