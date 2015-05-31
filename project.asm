@@ -55,6 +55,7 @@ end:
 	rcall lcd_command
 	rcall lcd_wait
 .endmacro
+
 .macro do_lcd_data
 	rcall lcd_data
 	rcall lcd_wait
@@ -178,8 +179,7 @@ update_character:
 	mov pattern,temp
 	rjmp continue
 
-convert: ; arrives here when a low signal has been found 
-	
+convert: ; arrives here when a low signal has been found 	
 	cpi col, 3 ; if its in col 3 then a letter is pressed
 	breq letters
 
@@ -294,8 +294,6 @@ start_running:
 	eor status, temp ; it rotates anticlockwise now, otherwise it rotates clockwise
 	pop temp
 	rjmp main
-
-
 
 return_to_entry_mode:
 	cbr status, 3 ; leave finished mode
@@ -422,7 +420,6 @@ clear_entered:
 	pop temp
 	rjmp main
 
-
 entering_time:	   
 	push r16
     push r17
@@ -449,8 +446,6 @@ return3:
     pop r17
     pop r16
 	ret
-
-	
 
 lcd_command:
 	out PORTF,r16
@@ -962,10 +957,6 @@ finish_rotating:
 	rcall Display_Turntable
 	pop r24
 	ret
-
-
-
-
 
 EXIT_INT0:
 	push r18
