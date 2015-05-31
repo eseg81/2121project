@@ -239,12 +239,11 @@ in_entry_mode:
 	cpi pattern, '*'
 	breq start_running
 	cpi pattern, '#'
-calling_clear_entered:
-	breq clear_entered
+	breq clear_entered_jump
 	cpi pattern, 'A'
-	breq power_selection_state
+	breq power_selection_state_jump
 	is_digit pattern
-	brts entering_time ; the T bit is set if pattern holds a digit
+	brts entering_time_jump ; the T bit is set if pattern holds a digit
 	jmp main ; if it is none of the above then no operation needs to be done
 
 in_running_mode:
@@ -262,7 +261,7 @@ in_paused_mode:
 	cpi pattern, '*'
 	breq resume_cooking
 	cpi pattern, '#'
-	breq cancel_operation
+	breq cancel_operation_jump
 	jmp main ; if it is none of the above then no operation needs to be done
 
 in_finished_mode:
@@ -270,20 +269,33 @@ in_finished_mode:
 	breq return_to_entry_mode
 	jmp main ; if it is none of the above then no operation needs to be done
 
-cancel_operation:
-	push r20
-	clr r20
-	sts Buffer, r20
-	sts Buffer+1, r21
-	do_lcd_command 0b00000010;cursorhome
-	do_lcd_command 0b00000001;clear display
-	pop r20
-	rjmp main
+clear_entered_jump:
+	rjmp clear_entered
+
+entering_time_jump:
+	rjmp entering_time
+
+power_selection_state_jump:
+	rjmp power_selection_state
+
+cancel_operation_jump:
+	rjmp cancel_operation
 
 pause:
 	cbr status, 1 ; leave running mode
 	sbr status, 2 ; enter paused mode
 	rjmp main
+
+start_running:
+	push temp
+	cbr status, 0 ; leave entry mode
+	sbr status, 1 ; now in running mode
+	ldi temp, 0b01000000 ; if the turntable rotated clockwise last then
+	eor status, temp ; it rotates anticlockwise now, otherwise it rotates clockwise
+	pop temp
+	rjmp main
+
+
 
 return_to_entry_mode:
 	cbr status, 3 ; leave finished mode
@@ -360,7 +372,6 @@ finished_subtracting_seconds:
 	pop r20
 	jmp main
 
-
 power_selection_state:	   
     push r16
 	rcall Display_Power_Text
@@ -389,9 +400,27 @@ exitPowerState:
     pop r16
     ret
 
-
+cancel_operation:
+	push r20
+	clr r20
+	sts Buffer, r20
+	sts Buffer+1, r21
+	do_lcd_command 0b00000010;cursorhome
+	do_lcd_command 0b00000001;clear display
+	pop r20
+	rjmp main
 	
-
+clear_entered:
+	push temp
+	clr temp
+	sts Buffer,temp
+	sts Buffer+1,temp
+	sts Buffer+2,temp
+	sts Buffer+3,temp
+    sts Time+1,temp
+    sts Time,temp
+	pop temp
+	rjmp main
 
 
 entering_time:	   
@@ -421,51 +450,7 @@ return3:
     pop r16
 	ret
 
-start_running:
-	push temp
-	cbr status, 0 ; leave entry mode
-	sbr status, 1 ; now in running mode
-	ldi temp, 0b01000000 ; if the turntable rotated clockwise last then
-	eor status, temp ; it rotates anticlockwise now, otherwise it rotates clockwise
-	pop temp
-	rjmp main
 	
-clear_entered:
-	push temp
-	clr temp
-	sts Buffer,temp
-	sts Buffer+1,temp
-	sts Buffer+2,temp
-	sts Buffer+3,temp
-    sts Time+1,temp
-    sts Time,temp
-	pop temp
-	rjmp calling_clear_entered
-	
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 lcd_command:
 	out PORTF,r16
