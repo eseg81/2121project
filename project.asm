@@ -29,15 +29,31 @@
 	brlo not_digit
 	cp temp, @0
 	brlo not_digit
-	sbr temp, 0 
+	ser temp 
 	bst temp, 0 ; sets the T bit in the SREG if it is a digit
 	rjmp end
 not_digit:
-	cbr temp, 0 ; clears the T bit in the SREG if it is a digit
+	clr temp ; clears the T bit in the SREG if it is a digit
 	bst temp, 0
 end:
 	pop temp
 .endmacro
+
+.macro set_bit
+	push temp
+	ser temp
+	bst temp, 0
+	bld @0, @1
+	pop temp
+.endmacro
+
+.macro clear_bit
+	push temp
+	clr temp
+	bst temp, 0
+	bld @0, @1
+	pop temp
+.endmacro	
 
 
 .macro lcd_set
@@ -78,7 +94,7 @@ RESET:
 	ldi temp,0xF0 ; set the columns up for output, rows for input
 	sts DDRL,temp
 	clr status
-	sbr status, 1 ; start off in entry mode with door closed
+	set_bit status, 1 ; start off in entry mode with door closed
 	
 	//set up pwm for motor. use timer3 for output compare match
 	ser temp
@@ -284,27 +300,27 @@ cancel_operation_jump:
 	rjmp cancel_operation
 
 pause:
-	cbr status, 1 ; leave running mode
-	sbr status, 2 ; enter paused mode
+	clear_bit status, 1 ; leave running mode
+	set_bit status, 2 ; enter paused mode
 	rjmp main
 
 start_running:
 	push temp
-	cbr status, 0 ; leave entry mode
-	sbr status, 1 ; now in running mode
+	clear_bit status, 0 ; leave entry mode
+	set_bit status, 1 ; now in running mode
 	ldi temp, 0b01000000 ; if the turntable rotated clockwise last then
 	eor status, temp ; it rotates anticlockwise now, otherwise it rotates clockwise
 	pop temp
 	rjmp main
 
 return_to_entry_mode:
-	cbr status, 3 ; leave finished mode
-	sbr status, 0 ; enter entry mode
+	clear_bit status, 3 ; leave finished mode
+	set_bit status, 0 ; enter entry mode
 	rjmp main
 
 resume_cooking:
-	cbr status, 2 ; leave paused mode
-	sbr status, 1 ; enter running mode
+	clear_bit status, 2 ; leave paused mode
+	set_bit status, 1 ; enter running mode
 	rjmp main
 
 add_one_minute:
@@ -362,8 +378,8 @@ load_new_seconds:
 	rjmp finished_subtracting_seconds
 
 no_time_left:
-	cbr status, 1 ; leaving running mode
-	sbr status, 3 ; entering finished mode
+	clear_bit status, 1 ; leaving running mode
+	set_bit status, 3 ; entering finished mode
 	rcall Display_Finished_Mode
 
 finished_subtracting_seconds:
@@ -375,7 +391,7 @@ finished_subtracting_seconds:
 power_selection_state:	   
     push r16
 	rcall Display_Power_Text
-	sbr status, 5 ; setting status to power selection state
+	set_bit status, 5 ; setting status to power selection state
     pop r16
     ret
 
@@ -396,7 +412,7 @@ p2:
     mov power,pattern
 
 exitPowerState:
-    cbr status,5
+    clear_bit status,5
     pop r16
     ret
 
@@ -605,7 +621,7 @@ Display_Time:
 Display_OC:
 	push r21
 	push r16
-	sbr r21,7
+	set_bit r21,7
 	out DDRC,r21
 
 	do_lcd_command 0b11000000;move to second line
@@ -905,8 +921,8 @@ one_minute_less:
 	rjmp finish_one_second_less
 
 cooking_finished:
-	cbr status, 1 ; running mode is over
-	sbr status, 3 ; now in finished mode
+	clear_bit status, 1 ; running mode is over
+	set_bit status, 3 ; now in finished mode
 	rcall Display_Finished_Mode
 
 finish_one_second_less:
@@ -984,7 +1000,7 @@ EXIT_INT0:
 	out EIFR,r18
 	ldi r24, 0
 	rcall Display_OC
-	sbr status, 4 ; the door is open
+	set_bit status, 4 ; the door is open
 	sbrc status, 1 ; if in running mode then pause
 	rjmp enter_pause
 	sbrc status, 3
@@ -992,13 +1008,13 @@ EXIT_INT0:
 	rjmp return_from_push
 
 enter_pause:
-	cbr status, 1 
-	sbr status, 2 ; entering pause mode
+	clear_bit status, 1 
+	set_bit status, 2 ; entering pause mode
 	rjmp return_from_push
 
 enter_entry:
-	cbr status, 3
-	sbr status, 0 ; entering entry mode	
+	clear_bit status, 3
+	set_bit status, 0 ; entering entry mode	
 	rjmp return_from_push	
 
 EXIT_INT1:
@@ -1023,7 +1039,7 @@ EXIT_INT1:
 	in r18,EIFR;clearing bouncing
 	cbr r18,1
 	out EIFR,r18
-	cbr status, 4 ; the door is closed
+	clear_bit status, 4 ; the door is closed
 	ldi r24, 1
 	rcall Display_OC
 
