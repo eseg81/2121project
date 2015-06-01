@@ -415,6 +415,7 @@ load_new_seconds:
 no_time_left:
 	clear_bit status, 1 ; leaving running mode
 	set_bit status, 3 ; entering finished mode
+	do_lcd_command 0b00000001;clear display
 	rcall Display_Finished_Mode
 
 finished_subtracting_seconds:
