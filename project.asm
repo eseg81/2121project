@@ -287,7 +287,7 @@ in_running_mode:
 
 in_paused_mode:
 	cpi pattern, '*'
-	breq resume_cooking
+	breq resume_cooking_jump
 	cpi pattern, '#'
 	breq cancel_operation_jump
 	jmp main ; if it is none of the above then no operation needs to be done
@@ -305,6 +305,9 @@ add_one_minute_jump:
 
 subtract_thirty_seconds_jump:
 	rjmp subtract_thirty_seconds
+
+resume_cooking_jump:
+	rjmp resume_cooking
 
 clear_entered_jump:
 	rjmp clear_entered
@@ -325,13 +328,26 @@ pause:
 
 start_running:
 	push temp
+	push r17
 	clear_bit status, 0 ; leave entry mode
 	set_bit status, 1 ; now in running mode
 	ldi temp, 0b01000000 ; if the turntable rotated clockwise last then
 	eor status, temp ; it rotates anticlockwise now, otherwise it rotates clockwise
+	ldi r17,0
+	cp index,r17
+	breq give_buffer_1min
+calling_transfer:
+	rcall Transfer_To_Time
+	pop r17
 	pop temp
 	rjmp main
 
+give_buffer_1min:
+	inc index;afte this index = 1
+	sts Buffer,index
+	inc index
+	inc index;index = 3
+	rjmp calling_transfer
 return_to_entry_mode:
 	clear_bit status, 3 ; leave finished mode
 	set_bit status, 0 ; enter entry mode
@@ -474,10 +490,6 @@ entering_time:
 	adc ZH,temp
 	st Z,pattern
 	inc index
-	cp index,r17
-	brne return3
-	clr index
-	rcall Transfer_To_Time
 return3:
 	rcall Display_Buffer
 	pop ZH
@@ -604,7 +616,7 @@ display_0:
 	rjmp return_0
 
 display_1:
-	ldi r16,92
+	ldi r16,164
 	do_lcd_data
 	rjmp return_0
 
@@ -630,7 +642,7 @@ Display_Time:
 	lds XL,Time
 	clr XH
 	rcall IntToA
-	lds r16,':'
+	ldi r16,':'
 	do_lcd_data 
 	lds XL,Time+1
 	clr XH
@@ -723,14 +735,6 @@ IntToA:
 	clr r21
 	clr r22
 	clr r23
-hundred:
-	cpi XL,100
-	ldi r20,0
-	cpc XH,r20
-	brsh addHundreds
-	mov r16,r21
-	add r16,r19;+'0'
-	do_lcd_data
 ten:
 	cpi XL,10
 	brsh addTens
@@ -751,11 +755,6 @@ one:
 	pop r16
 	ret	
 	
-addHundreds:
-	inc r21
-	sbiw XH:XL,50
-	sbiw XH:XL,50
-	rjmp hundred	
 addTens:
 	inc r22
 	subi XL,10
@@ -813,24 +812,54 @@ light:
 	rjmp comparing_intensity
 
 Display_Buffer:
-	push r16
-	push r17
-	do_lcd_command 0b00000010
+	push r16 ;do_lcd_data register
+	push r17 ;'0' offset
+	push r18 ;store the value of index in order to print zero before digits
+	push r19 
+	push r20 ;print counter
+	push ZH ;pointer to digits in buffer
+	push ZL
+	ldi r19,4
+	mov r18,index
 	ldi r17,'0'
-	lds r16,Buffer
-	add r16,r17
+	clr r20
+	ldi ZH,high(Buffer)
+	ldi ZL,low(Buffer)
+	do_lcd_command 0b00000010 ;cursor home
+print_zero:	
+	cpi r18,4;digit entered and 4
+	breq print_digits
+	mov r16,r17
 	do_lcd_data
-	lds r16,Buffer+1
-	add r16,r17
-	do_lcd_data
+	inc r18
+	inc r20
+	cpi r20,2
+	brne no_printing_colon
 	ldi r16,':'
 	do_lcd_data
-	lds r16,Buffer+2
+no_printing_colon:
+	rjmp print_zero
+
+print_digits:
+	ld r16,Z
 	add r16,r17
 	do_lcd_data
-	lds r16,Buffer+3
-	add r16,r17
+	inc r20
+	adiw ZH:ZL,1
+	cpi r20,2
+	brne no_printing_colon_again
+	ldi r16,':'
 	do_lcd_data
+no_printing_colon_again:
+	cpi r20,4
+	breq return5
+	rjmp print_digits		
+return5:
+	pop ZL
+	pop ZH
+	pop r20
+	pop r19
+	pop r18
 	pop r17
 	pop r16
 	ret
@@ -839,23 +868,59 @@ Display_Buffer:
 //Transfer values from Buffer to Time in data space
 Transfer_To_Time:
 	push r16
-	push r17
-    push r18
-    push r19
-    ldi r16,10
-    lds r19,Buffer+1
-    lds r18,Buffer
+	push r17;index buffer
+    push r18;lower digit buffer
+    push r19;higher digit buffer
+	clr r17
+	ldi r16,10
+	
+	mov r17,index
+	cpi r17,1
+	breq one_digit
+	cpi r17,2
+	breq two_digit
+	cpi r17,3
+	breq three_digit
+	lds r19,Buffer
+	lds r18,Buffer+1
+	mul r19,r16
+	mov r19,r0
+	add r19,r18
+	sts Time,r19
+
+	lds r19,Buffer+2
+	lds r18,Buffer+3
+	mul r19,r16
+	add r19,r18
+	sts Time+1,r19
+	rjmp return4
+one_digit:
+	lds r19,Buffer
+	sts Time+1,r19
+	rjmp return4
+
+two_digit:
+    lds r19,Buffer
+    lds r18,Buffer+1
     mul r19,r16
     mov r19,r0;
 	add r19,r18
-    sts Time,r19
-   
-    lds r19,Buffer+3
+    sts Time+1,r19
+	rjmp return4
+
+three_digit:
+	lds r19,Buffer+1
     lds r18,Buffer+2
     mul r19,r16
     mov r19,r0;
 	add r19,r18
     sts Time+1,r19
+	
+	lds r19,Buffer
+	sts Time,r19
+	rjmp return4
+return4:
+	clr index
     pop r19
     pop r18
     pop r17
