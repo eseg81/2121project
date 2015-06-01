@@ -168,6 +168,13 @@ colloop:
 	breq update_character
 	sts PORTL,cmask ; give the current column low signal 
 
+	ldi temp,255
+delay:
+	cpi temp,0
+	breq go_on
+	dec temp
+	rjmp delay
+go_on:
 	lds temp,PINL ; reads in the signals from PORT L
 	andi temp,0x0F ; isolate the input from the rows
 	cpi temp,0xF ; if all rows are low, proceed to next col
@@ -423,12 +430,13 @@ p1:
     ret ; invalid input, polling to read next input
 p2:
     mov power,pattern
+	rcall Display_LED
 
 exitPowerState:
     clear_bit status,5
 	do_lcd_command 0b00000001;clear display
     pop r16
-    ret
+    jmp main
 
 cancel_operation:
 	push r20
