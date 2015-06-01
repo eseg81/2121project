@@ -153,6 +153,9 @@ RESET:
 	sts Time+1,temp
 	sts Halfseconds, temp
 	
+	ldi r24, 1 ; start off displaying closed door 
+	rcall Display_OC
+	
 	ldi temp,0
 	mov index,temp
 	ldi debouncing,0
