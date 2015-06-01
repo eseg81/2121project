@@ -485,7 +485,7 @@ return3:
 	pop temp
     pop r17
     pop r16
-	ret
+	jmp main
 
 lcd_command:
 	out PORTF,r16
@@ -815,6 +815,7 @@ light:
 Display_Buffer:
 	push r16
 	push r17
+	do_lcd_command 0b00000010
 	ldi r17,'0'
 	lds r16,Buffer
 	add r16,r17
