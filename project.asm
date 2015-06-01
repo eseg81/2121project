@@ -478,13 +478,13 @@ clear_entered:
 
 entering_time:	
 	push r16
-    	push r17
+    push r17
 	push temp
 	push ZL
 	push ZH
-	cpi index,4
+	ldi r17,4
+	cp index,r17
 	breq return3 ;4digtis have been entered  
-    	ldi r17,4
 	clr temp
 	ldi ZL,low(Buffer)
 	ldi ZH,high(Buffer)
@@ -497,8 +497,8 @@ return3:
 	pop ZH
 	pop ZL
 	pop temp
-    	pop r17
-    	pop r16
+    pop r17
+    pop r16
 	jmp main
 
 lcd_command:
