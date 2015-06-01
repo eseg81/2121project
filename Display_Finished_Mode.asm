@@ -228,7 +228,7 @@ return_1:
 	ret	
 	
 Display_Power_Text
-		do_lcd_data 'R'
+	do_lcd_data 'R'
 	do_lcd_data 'S'
 	do_lcd_data 'e'
 	do_lcd_data 't'
@@ -243,6 +243,41 @@ Display_Power_Text
 	do_lcd_data '2'
 	do_lcd_data '/'
 	do_lcd_data '3'
+
+Display_LED:
+	push r18
+	push r17
+	cpi power,1
+	breq LED_1
+	cpi power,2
+	breq LED_2
+	ser r17
+	out PORTC,r17
+
+return_LED:
+	pop r17
+	pop r18
+	ret
+
+LED_1:
+	sbi PORTC,0
+	sbi PORTC,1
+	rjmp return_LED
+
+LED_2:
+	sbi PORTC,0
+	sbi PORTC,1
+	sbi PORTC,2
+	sbi PORTC,3
+	rjmp return_LED
+
+Clear_LED:
+	push  r17
+	clr r17
+	out PORTC,r17
+	pop r17
+	ret
+	
 .dseg
 Time:
 	.byte 2

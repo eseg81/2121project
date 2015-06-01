@@ -7,7 +7,7 @@
 .equ F_CPU = 16000000
 .equ DELAY_1MS = F_CPU / 4 / 1000 - 4
 .def index = r3
-.def power = r27
+.def power = r28
 .def col = r16 ; stores the current column being scanned
 .def row = r17 ; stores the current row
 .def cmask = r18 ; column mask used to determine which column to give low signal
@@ -19,7 +19,7 @@
 				  ; bit 2 set when in paused mode, bit 3 set when in finished mode
 				  ; bit 4 set when door open (0 when closed), bit 5 set when in power level
 				  ; bit 6 set when the turntable rotates clockwise, 0 anticlockwise
-.def debouncing = r26;0 when key is pressed 0xFF when key is released(0 by default)
+.def debouncing = r29;1 when key is entered
 .def last_turntable_char = r25
 
 .macro is_digit ; checks if the value in pattern is a digit between 0-9
@@ -93,8 +93,10 @@ RESET:
 	out SPL,temp
 	ldi temp,0xF0 ; set the columns up for output, rows for input
 	sts DDRL,temp
+	ldi temp,0xEF
+	sts PORTL,temp
 	clr status
-	set_bit status, 1 ; start off in entry mode with door closed
+	set_bit status, 0 ; start off in entry mode with door closed
 	
 	//set up pwm for motor. use timer3 for output compare match
 	ser temp
@@ -110,13 +112,13 @@ RESET:
 	sts TCCR3A, temp
 
 	//set up phase correct PWM mode for back light
-	clr temp
+/*	clr temp
 	sts OCR5BL,temp
 	sts OCR5BH,temp
 	ldi temp, (1 << CS50)
 	sts TCCR5B, temp
 	ldi temp, (1<< WGM50)|(1<<COM5B1)
-	sts TCCR5A, temp
+	sts TCCR5A, temp*/
 	
 	//setup ports for keypad and LED
 	ser temp
@@ -171,7 +173,7 @@ colloop:
 	cpi temp,0xF ; if all rows are low, proceed to next col
 	breq nextcol
 	clr row ; some row is low, need to determine which
-	ldi rmask,1 ; starting from row 0
+	ldi rmask,1 ; starting from row 07
 
 rowloop:
 	cpi row,4
@@ -206,6 +208,7 @@ convert: ; arrives here when a low signal has been found
 	mov temp, R0 ; which finds out which number
 	inc temp ; is pressed
 	add temp,col
+	mov pattern,temp
 	
 	ldi debouncing,1;not ready i.e. key is being pressed
 	rjmp main
@@ -266,13 +269,13 @@ in_entry_mode:
 
 in_running_mode:
 	cpi pattern, '*'
-	breq add_one_minute
+	breq add_one_minute_jump
 	cpi pattern, '#'
 	breq pause
 	cpi pattern, 'C'
-	breq add_thirty_seconds
+	breq add_thirty_seconds_jump
 	cpi pattern, 'D'
-	breq subtract_thirty_seconds
+	breq subtract_thirty_seconds_jump
 	jmp main ; if it is none of the above then no operation needs to be done
 
 in_paused_mode:
@@ -286,6 +289,15 @@ in_finished_mode:
 	cpi pattern, '#'
 	breq return_to_entry_mode
 	jmp main ; if it is none of the above then no operation needs to be done
+
+add_thirty_seconds_jump:
+	rjmp add_thirty_seconds
+
+add_one_minute_jump:
+	rjmp add_one_minute
+
+subtract_thirty_seconds_jump:
+	rjmp subtract_thirty_seconds
 
 clear_entered_jump:
 	rjmp clear_entered
@@ -391,9 +403,9 @@ finished_subtracting_seconds:
 power_selection_state:	   
     push r16
 	rcall Display_Power_Text
-	set_bit status, 5 ; setting status to power selection state
+	set_bit status,5
     pop r16
-    ret
+    jmp main
 
 in_power_state:
     push r16
@@ -401,6 +413,7 @@ in_power_state:
     breq exitPowerState
     cpi pattern, 4    
     brlo p1 ; less than 4
+
     pop r16
     ret ; invalid input, polling to read next input
 p1:
@@ -413,6 +426,7 @@ p2:
 
 exitPowerState:
     clear_bit status,5
+	do_lcd_command 0b00000001;clear display
     pop r16
     ret
 
@@ -658,8 +672,6 @@ return_1:
 	
 Display_Power_Text:
 	push r16
-	ldi r16,'R'
-	do_lcd_data 
 	ldi r16,'S'
 	do_lcd_data 
 	ldi r16,'e'
@@ -794,16 +806,23 @@ light:
 
 Display_Buffer:
 	push r16
+	push r17
+	ldi r17,'0'
 	lds r16,Buffer
+	add r16,r17
 	do_lcd_data
 	lds r16,Buffer+1
+	add r16,r17
 	do_lcd_data
 	ldi r16,':'
 	do_lcd_data
 	lds r16,Buffer+2
+	add r16,r17
 	do_lcd_data
 	lds r16,Buffer+3
+	add r16,r17
 	do_lcd_data
+	pop r17
 	pop r16
 	ret
 
@@ -1047,6 +1066,40 @@ return_from_push:
 	pop r24
 	pop r18
 	reti
+
+Display_LED:
+	push r18
+	push r17
+	cpi power,1
+	breq LED_1
+	cpi power,2
+	breq LED_2
+	ser r17
+	out PORTC,r17
+
+return_LED:
+	pop r17
+	pop r18
+	ret
+
+LED_1:
+	sbi PORTC,0
+	sbi PORTC,1
+	rjmp return_LED
+
+LED_2:
+	sbi PORTC,0
+	sbi PORTC,1
+	sbi PORTC,2
+	sbi PORTC,3
+	rjmp return_LED
+
+Clear_LED:
+	push  r17
+	clr r17
+	out PORTC,r17
+	pop r17
+	ret
 
 .dseg
 Buffer:
