@@ -329,15 +329,19 @@ pause:
 start_running:
 	push temp
 	push r17
+	push r24
 	clear_bit status, 0 ; leave entry mode
 	set_bit status, 1 ; now in running mode
 	ldi temp, 0b01000000 ; if the turntable rotated clockwise last then
 	eor status, temp ; it rotates anticlockwise now, otherwise it rotates clockwise
+	ldi r24, 2 ; start the turntable display
+	rcall Display_Turntable
 	ldi r17,0
 	cp index,r17
 	breq give_buffer_1min
 calling_transfer:
 	rcall Transfer_To_Time
+	pop r24
 	pop r17
 	pop temp
 	rjmp main
@@ -962,10 +966,11 @@ quarter_second:
 	rjmp finish_timer_interrupt
 
 half_second:
-	cpi power, 2 ; if in power mode 2, then the motor should only for 500ms
-	brne finish_timer_interrupt
-	ldi r24, 0 ; so shut off now
+	cpi power, 2 ; if in power mode 2, then the motor should only spin for 500ms
+	brne update_half_seconds
+	ldi r24, 0 
 	rcall Motor_Spin
+update_half_seconds:
 	lds temp, Halfseconds ; update the amount of half seconds
 	inc temp
 	cpi temp, 5 ; if there has been 5 half seconds
@@ -997,6 +1002,7 @@ finish_timer_interrupt:
 	reti
 
 one_second_less:
+	push r24
 	push r26
 	push r27
 	push temp
@@ -1019,6 +1025,8 @@ one_minute_less:
 cooking_finished:
 	clear_bit status, 1 ; running mode is over
 	set_bit status, 3 ; now in finished mode
+	ldi r24, 0 ; turn the motor off
+	rcall Motor_Spin
 	rcall Display_Finished_Mode
 
 finish_one_second_less:
@@ -1027,6 +1035,7 @@ finish_one_second_less:
 	pop temp
 	pop r27
 	pop r26
+	pop r24
 	ret	         
 
 rotate_turntable:
