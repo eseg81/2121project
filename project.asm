@@ -78,7 +78,7 @@ RESET:
 	ldi temp,0xF0 ; set the columns up for output, rows for input
 	sts DDRL,temp
 	clr status
-	sbr status, 0 ; start off in entry mode with door closed
+	sbr status, 1 ; start off in entry mode with door closed
 	
 	//set up pwm for motor. use timer3 for output compare match
 	ser temp
@@ -176,7 +176,6 @@ update_character:
 	cpi debouncing,1;key was pressed before
 	brne main
 	clr debouncing
-	mov pattern,temp
 	rjmp continue
 
 convert: ; arrives here when a low signal has been found 	
@@ -199,6 +198,7 @@ letters: ; find which letter pressed
 	ldi temp, 'A'
 	add temp, row
 	ldi debouncing,1;not ready i.e. key is being pressed
+	mov pattern,temp
 	rjmp main
 
 symbols_or_0: ; find which symbol pressed, or if 0
@@ -208,20 +208,22 @@ symbols_or_0: ; find which symbol pressed, or if 0
 	breq zero
 	ldi temp, '#' ; otherwise it is #
 	ldi debouncing,1;not ready i.e. key is being pressed
+	mov pattern,temp
 	rjmp main
 	
 star:
 	ldi temp, '*'
 	ldi debouncing,1;not ready i.e. key is being pressed
+	mov pattern,temp
 	rjmp main
 	
 zero:
 	ldi temp, 0		 
 	ldi debouncing,1;not ready i.e. key is being pressed
+	mov pattern,temp
 	rjmp main
 
 continue:
-	mov pattern,temp
 	rjmp act_on_input
 
 act_on_input: ; deals with the key entered on the keypad	   
