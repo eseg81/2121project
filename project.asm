@@ -385,11 +385,17 @@ add_one_minute:
 add_thirty_seconds: ; adds 30 seconds to the cooking time
 	push r20
 	push r21
+	push r22
 	lds r20, Time+1 ; r20 now stores the amount of seconds
 	ldi r21, 30
 	add r20, r21
 	cpi r20, 100 ; maximum number of seconds is 99
 	brge adjust_minute_addition ; need to increment the minutes if it 100 or over
+	lds r21, Time
+	cpi r20, 100
+	ldi r22, 99
+	cpc r21, r22
+	brge max_time
 	sts Time+1, r20 
 	rjmp finished_adding_seconds
 
@@ -399,8 +405,15 @@ adjust_minute_addition:
 	sts Time, r21
 	subi r20, 60 ; since a minute is added, there is now 60 less seconds
 	sts Time+1, r20
+	rjmp finished_adding_seconds
+
+max_time:
+	ldi r21, 99
+	sts Time, r21
+	sts Time+1, r21
 
 finished_adding_seconds:
+	pop r22
 	pop r21
 	pop r20 
 	jmp main		
