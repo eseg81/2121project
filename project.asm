@@ -662,6 +662,8 @@ return_0:
 Display_Time:
 	push r16
 	push r21
+	push XL
+	push XH
 	do_lcd_command 0b00000010;cursor home
 	lds XL,Time
 	clr XH
@@ -671,6 +673,8 @@ Display_Time:
 	lds XL,Time+1
 	clr XH
 	rcall IntToA
+	pop XH
+	pop XL
 	pop r21
 	pop r16
 	ret
