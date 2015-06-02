@@ -152,6 +152,9 @@ RESET:
 	sts Time,temp
 	sts Time+1,temp
 	sts Halfseconds, temp
+
+	ldi temp, 0b00000011 
+	out EIMSK, temp ; turning on external interrupt 0 and 1
 	
 	ldi r24, 1 ; start off displaying closed door 
 	rcall Display_OC
@@ -401,20 +404,21 @@ subtract_thirty_seconds: ; subtracts 30 seconds from the cooking time
 	push r22
 	lds r20, Time+1
 	lds r21, Time
-	subi r20, 30
-	cpi r20, 1
+	cpi r20, 31
 	clr r22			  ; if subtracting 30 seconds causes the cooking time to be 0 minutes and 
 	cpc r21, r22	  ; 0 seconds or less then the cooking is finished
 	brlt no_time_left  
-	cpi r20, 0 ; if subtracting 30 seconds leaves greater than or exactly 0 seconds
+	cpi r20, 30 ; if subtracting 30 seconds leaves greater than or exactly 0 seconds
 	brge load_new_seconds ; then that is simply the new amount of seconds
 	dec r21 ; otherwise need to decrement the minutes and adjust the seconds
 	ldi r22, 30 ; in this case the new seconds is 60- (30 - old amount of seconds)
 	add r22, r20
+	sts Time, r21
 	sts Time+1, r22
 	rjmp finished_subtracting_seconds
 		
 load_new_seconds:
+	subi r20, 30
 	sts Time+1, r20
 	rjmp finished_subtracting_seconds
 
@@ -422,6 +426,8 @@ no_time_left:
 	clear_bit status, 1 ; leaving running mode
 	set_bit status, 3 ; entering finished mode
 	ldi r24, 0 ; turn the motor off
+	sts Time, r24
+	sts Time+1, r24
 	rcall Motor_Spin
 	rcall Clear_LED
 	rcall Display_Finished_Mode
