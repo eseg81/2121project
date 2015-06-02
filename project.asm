@@ -422,7 +422,9 @@ load_new_seconds:
 no_time_left:
 	clear_bit status, 1 ; leaving running mode
 	set_bit status, 3 ; entering finished mode
-	do_lcd_command 0b00000001;clear display
+	ldi r24, 0 ; turn the motor off
+	rcall Motor_Spin
+	rcall Clear_LED
 	rcall Display_Finished_Mode
 
 finished_subtracting_seconds:
@@ -574,6 +576,11 @@ sleep_5ms:
 	ret
 
 Display_Finished_Mode:
+	push r16
+	push r24
+	do_lcd_command 0b00000001;clear display
+	ldi r24,1
+	rcall display_OC
 	ldi r16, 'D'
 	do_lcd_data
 	ldi r16, 'O'
@@ -606,6 +613,8 @@ Display_Finished_Mode:
 	do_lcd_data
 	ldi r16, 'd'
 	do_lcd_data
+	pop r24
+	pop r16
 	ret
 
 //call this function after setting the r24 to the corresponding 
@@ -1035,6 +1044,7 @@ cooking_finished:
 	clear_bit status, 1 ; running mode is over
 	set_bit status, 3 ; now in finished mode
 	ldi r24, 0 ; turn the motor off
+	rcall Clear_LED
 	rcall Motor_Spin
 	rcall Display_Finished_Mode
 
