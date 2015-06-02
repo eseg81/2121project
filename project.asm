@@ -1049,7 +1049,7 @@ one_minute_less:
 cooking_finished:
 	clear_bit status, 1 ; running mode is over
 	set_bit status, 3 ; now in finished mode
-	ldi r24, 0 ; turn the motor off
+	ldi r24, 0 ; so turn the motor off
 	rcall Clear_LED
 	rcall Motor_Spin
 	rcall Display_Finished_Mode
