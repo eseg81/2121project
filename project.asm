@@ -1004,7 +1004,7 @@ five_halfseconds:
 
 one_second:
 	rcall one_second_less ; the timer has one second less
-	rcall Display_Time
+;	rcall Display_Time
 	ldi r24, 255 ; all power modes the motor starts off spinning
 	rcall Motor_Spin
 	clr r26
@@ -1033,11 +1033,13 @@ one_second_less:
 	cpi r26, 0 ; if there are 0 seconds then the timer has now 59 seconds and one minute less
 	breq one_minute_less
 	dec r26 ; otherwise just decrease the seconds
+	rcall Display_Time
 	rjmp finish_one_second_less
 
 one_minute_less:
 	dec r27
 	ldi r26, 59
+	rcall Display_Time
 	rjmp finish_one_second_less
 
 cooking_finished:
