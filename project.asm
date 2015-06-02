@@ -440,6 +440,7 @@ power_selection_state:
 
 in_power_state:
     push r16
+	push r24
     cpi pattern, '#'
     breq exitPowerState
     cpi pattern, 4    
@@ -454,11 +455,15 @@ p1:
     ret ; invalid input, polling to read next input
 p2:
     mov power,pattern
+	rcall clear_LED
 	rcall Display_LED
 
 exitPowerState:
     clear_bit status,5
 	do_lcd_command 0b00000001;clear display
+	ldi r24,1
+	rcall display_OC
+	pop r24
     pop r16
     jmp main
 
@@ -665,8 +670,6 @@ Display_Time:
 Display_OC:
 	push r21
 	push r16
-	set_bit r21,7
-	out DDRC,r21
 
 	do_lcd_command 0b11000000;move to second line
     rcall move_cursor
@@ -674,6 +677,8 @@ Display_OC:
 	breq set_to_O
 	ldi r16,'C'
 	do_lcd_data
+	pop r16
+	pop r21
 	ret
 set_to_O:
 	ldi r16,'O'
@@ -702,6 +707,7 @@ return_1:
 	
 Display_Power_Text:
 	push r16
+	do_lcd_command 0b00000010 ;cursor home
 	ldi r16,'S'
 	do_lcd_data 
 	ldi r16,'e'
