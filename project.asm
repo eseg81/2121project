@@ -170,7 +170,6 @@ colloop:
 	cpi col,4 ; if got to col 4, start scanning again from col 0
 	breq update_character
 	sts PORTL,cmask ; give the current column low signal 
-
 	ldi temp,255
 delay:
 	cpi temp,0
@@ -579,8 +578,7 @@ Display_Finished_Mode:
 	push r16
 	push r24
 	do_lcd_command 0b00000001;clear display
-	ldi r24,1
-	rcall display_OC
+	do_lcd_command 0b00000010 ; cursor home
 	ldi r16, 'D'
 	do_lcd_data
 	ldi r16, 'O'
@@ -613,6 +611,8 @@ Display_Finished_Mode:
 	do_lcd_data
 	ldi r16, 'd'
 	do_lcd_data
+	ldi r24,1
+	rcall display_OC
 	pop r24
 	pop r16
 	ret
