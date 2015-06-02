@@ -485,7 +485,11 @@ cancel_operation:
 	push r20
 	clr r20
 	sts Buffer, r20
-	sts Buffer+1, r21
+	sts Buffer+1, r20
+	sts Time, r20
+	sts Time+1, r20
+	clear_bit status, 2
+	set_bit status, 0
 	do_lcd_command 0b00000010;cursorhome
 	do_lcd_command 0b00000001;clear display
 	pop r20
