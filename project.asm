@@ -153,8 +153,12 @@ RESET:
 	sts Time+1,temp
 	sts Halfseconds, temp
 
-	ldi temp, 0b00000011
-	out EIMSK, temp ; turning on external interrupt 0 and 1
+	ldi temp,(2 << ISC00 | 2 << ISC10);setting mode falling edge
+	sts EICRA,temp
+
+	in temp,EIMSK
+	ori temp,(1 << INT0 | 1 << INT1)
+	out EIMSK,temp   ;enable external interrupt 0 and 1
 	
 	ldi r24, 1 ; start off displaying closed door 
 	rcall Display_OC
@@ -209,6 +213,7 @@ update_character:
 	rjmp continue
 
 convert: ; arrives here when a low signal has been found 	
+	ldi debouncing,1
 	cpi col, 3 ; if its in col 3 then a letter is pressed
 	breq letters
 
@@ -222,13 +227,11 @@ convert: ; arrives here when a low signal has been found
 	add temp,col
 	mov pattern,temp
 	
-	ldi debouncing,1;not ready i.e. key is being pressed
 	rjmp main
 
 letters: ; find which letter pressed
 	ldi temp, 'A'
 	add temp, row
-	ldi debouncing,1;not ready i.e. key is being pressed
 	mov pattern,temp
 	rjmp main
 
@@ -238,19 +241,16 @@ symbols_or_0: ; find which symbol pressed, or if 0
 	cpi col, 1 ; col 1 is 0
 	breq zero
 	ldi temp, '#' ; otherwise it is #
-	ldi debouncing,1;not ready i.e. key is being pressed
 	mov pattern,temp
 	rjmp main
 	
 star:
 	ldi temp, '*'
-	ldi debouncing,1;not ready i.e. key is being pressed
 	mov pattern,temp
 	rjmp main
 	
 zero:
 	ldi temp, 0		 
-	ldi debouncing,1;not ready i.e. key is being pressed
 	mov pattern,temp
 	rjmp main
 
@@ -483,6 +483,7 @@ exitPowerState:
 
 cancel_operation:
 	push r20
+	push r24
 	clr r20
 	sts Buffer, r20
 	sts Buffer+1, r20
@@ -492,6 +493,9 @@ cancel_operation:
 	set_bit status, 0
 	do_lcd_command 0b00000010;cursorhome
 	do_lcd_command 0b00000001;clear display
+	ldi r24,1
+	rcall Display_OC
+	pop r24
 	pop r20
 	rjmp main
 	
