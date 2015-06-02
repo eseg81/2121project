@@ -254,7 +254,9 @@ zero:
 continue:
 	rjmp act_on_input
 
-act_on_input: ; deals with the key entered on the keypad	   
+act_on_input: ; deals with the key entered on the keypad
+	sbrc status,4;if door is opened,ignore
+	rjmp main	   
     sbrc status,5
     rjmp in_power_state ; go to select power level
 	sbrc status, 0 ; deal differently with input depending what mode the microwave is in
@@ -324,6 +326,8 @@ cancel_operation_jump:
 	rjmp cancel_operation
 
 pause:
+	ldi r24,0;stopping the motor
+	rcall Motor_Spin
 	clear_bit status, 1 ; leave running mode
 	set_bit status, 2 ; enter paused mode
 	rjmp main
@@ -357,6 +361,9 @@ give_buffer_1min:
 return_to_entry_mode:
 	clear_bit status, 3 ; leave finished mode
 	set_bit status, 0 ; enter entry mode
+	do_lcd_command 0b00000001;clear display
+	ldi r24,1;display closed state
+	rcall Display_OC
 	rjmp main
 
 resume_cooking:
@@ -917,10 +924,10 @@ Transfer_To_Time:
 	add r19,r18
 	sts Time,r19
 
-	ldi r16,10
 	lds r19,Buffer+2
 	lds r18,Buffer+3
 	mul r19,r16
+	mov r19,r0
 	add r19,r18
 	sts Time+1,r19
 	rjmp return4
@@ -1150,6 +1157,9 @@ enter_pause:
 enter_entry:
 	clear_bit status, 3
 	set_bit status, 0 ; entering entry mode	
+	do_lcd_command 0b00000001;clear display
+	ldi r24, 0
+	rcall Display_OC
 	rjmp return_from_push	
 
 EXIT_INT1:
