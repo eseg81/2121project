@@ -127,7 +127,10 @@ RESET:
 	out DDRF,temp;For keypad
 	out DDRA,temp;For control of the keypad
 	out DDRC,temp;for LED
+	ldi temp,0b11000000;only first 2bits
+	sts DDRH,temp
 	clr temp
+	sts PORTH,temp
 	out PORTF,temp
 	out PORTA,temp
 	out PORTC,temp
@@ -344,6 +347,7 @@ start_running:
 	push r24
 	clear_bit status, 0 ; leave entry mode
 	set_bit status, 1 ; now in running mode
+	rcall Display_LED
 	ldi temp, 0b01000000 ; if the turntable rotated clockwise last then
 	eor status, temp ; it rotates anticlockwise now, otherwise it rotates clockwise
 	ldi r24, 2 ; start the turntable display
@@ -502,6 +506,7 @@ cancel_operation:
 	do_lcd_command 0b00000001;clear display
 	ldi r24,1
 	rcall Display_OC
+	rcall Clear_LED
 	pop r16
 	pop r24
 	pop r20
@@ -1149,6 +1154,8 @@ EXIT_INT1:
 	reti
 	push r18
 	push r24
+	in r24, sreg
+	push r24
 	rcall sleep_5ms
 	rcall sleep_5ms
 	rcall sleep_5ms
@@ -1171,6 +1178,9 @@ EXIT_INT1:
 	ldi r24, 0
 	rcall Display_OC
 
+	lds r24,PORTH
+	ori r24,0b10000000
+	sts PORTH,r24
 	mov old_status, status
 	set_bit status, 4 ; the door is open
 	sbrc status, 1 ; if in running mode then pause
@@ -1184,7 +1194,6 @@ enter_pause:
 	set_bit status, 2 ; entering pause mode
 	ldi r24,0
 	rcall Motor_Spin
-	rcall Clear_LED
 	rjmp return_from_push
 
 enter_entry:
@@ -1199,6 +1208,8 @@ EXIT_INT0:
 	sbrs status, 4
 	reti
 	push r18
+	push r24
+	in r24, sreg
 	push r24
 	rcall sleep_5ms
 	rcall sleep_5ms
@@ -1224,8 +1235,13 @@ EXIT_INT0:
 
 	ldi r24, 1
 	rcall Display_OC
+	lds r24,PORTH
+	andi r24,0b01111111
+	sts PORTH,r24
 
 return_from_push:
+	pop r24
+	out sreg, r24
 	pop r24
 	pop r18
 	reti
@@ -1233,7 +1249,7 @@ return_from_push:
 Display_LED:
 	push r18
 	push r17
-	cpi power,1
+	cpi power,3
 	breq LED_1
 	cpi power,2
 	breq LED_2
