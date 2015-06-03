@@ -125,12 +125,9 @@ RESET:
 	//setup ports for keypad and LED
 	ser temp
 	out DDRF,temp;For keypad
-	out DDRA,temp;For control of the keypad
+	out DDRA,temp;For control of the display
 	out DDRC,temp;for LED
-	ldi temp,0b11000000;only first 2bits
-	sts DDRH,temp
 	clr temp
-	sts PORTH,temp
 	out PORTF,temp
 	out PORTA,temp
 	out PORTC,temp
@@ -392,25 +389,37 @@ add_one_minute:
 add_thirty_seconds: ; adds 30 seconds to the cooking time
 	push r20
 	push r21
+	push r22
 	lds r20, Time+1 ; r20 now stores the amount of seconds
 	ldi r21, 30
 	add r20, r21
+	lds r21, Time ; r21 now holds the amount of minutes
+	cpi r20, 100
+	ldi r22, 99
+	cpc r21, r22
+	brge max_time
 	cpi r20, 100 ; maximum number of seconds is 99
-	brge adjust_minute_addition ; need to increment the minutes if it 100 or over
+	brge adjust_minute_addition ; need to increment the minutes if seconds is 100 or over
 	sts Time+1, r20 
 	rjmp finished_adding_seconds
 
 adjust_minute_addition:
-	lds r21, Time
 	inc r21
 	sts Time, r21
 	subi r20, 60 ; since a minute is added, there is now 60 less seconds
 	sts Time+1, r20
+	rjmp finished_adding_seconds
+
+max_time:
+	ldi r21, 99
+	sts Time, r21
+	sts Time+1, r21
 
 finished_adding_seconds:
+	pop r22
 	pop r21
 	pop r20 
-	jmp main		
+	jmp main
 
 subtract_thirty_seconds: ; subtracts 30 seconds from the cooking time
 	push r20
@@ -1045,11 +1054,13 @@ five_halfseconds:
 
 one_second:
 	rcall one_second_less ; the timer has one second less
-;	rcall Display_Time
-;	ldi r24, 255 ; all power modes the motor starts off spinning
-;	rcall Motor_Spin
 	clr r26
 	clr r27
+	lds temp, Halfseconds
+	inc temp
+	cpi temp, 5
+	breq five_halfseconds
+	sts Halfseconds, temp
 
 finish_timer_interrupt:
 	sts Timecounter, r26
@@ -1178,9 +1189,9 @@ EXIT_INT1:
 	ldi r24, 0
 	rcall Display_OC
 
-	lds r24,PORTH
-	ori r24,0b10000000
-	sts PORTH,r24
+	in r24,PORTA
+	ori r24,0b11110000
+	out PORTA,r24
 	mov old_status, status
 	set_bit status, 4 ; the door is open
 	sbrc status, 1 ; if in running mode then pause
@@ -1235,9 +1246,9 @@ EXIT_INT0:
 
 	ldi r24, 1
 	rcall Display_OC
-	lds r24,PORTH
-	andi r24,0b01111111
-	sts PORTH,r24
+	in r24,PORTA
+	andi r24,0b00001111
+	out PORTA,r24
 
 return_from_push:
 	pop r24
