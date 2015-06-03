@@ -329,6 +329,8 @@ cancel_operation_jump:
 	rjmp cancel_operation
 
 pause:
+	ldi r16,'p'
+	do_lcd_data
 	ldi r24,0;stopping the motor
 	rcall Motor_Spin
 	clear_bit status, 1 ; leave running mode
@@ -385,34 +387,22 @@ add_one_minute:
 add_thirty_seconds: ; adds 30 seconds to the cooking time
 	push r20
 	push r21
-	push r22
 	lds r20, Time+1 ; r20 now stores the amount of seconds
 	ldi r21, 30
 	add r20, r21
-	lds r21, Time ; r21 now holds the amount of minutes
-	cpi r20, 100
-	ldi r22, 99
-	cpc r21, r22
-	brge max_time
 	cpi r20, 100 ; maximum number of seconds is 99
-	brge adjust_minute_addition ; need to increment the minutes if seconds is 100 or over
+	brge adjust_minute_addition ; need to increment the minutes if it 100 or over
 	sts Time+1, r20 
 	rjmp finished_adding_seconds
 
 adjust_minute_addition:
+	lds r21, Time
 	inc r21
 	sts Time, r21
 	subi r20, 60 ; since a minute is added, there is now 60 less seconds
 	sts Time+1, r20
-	rjmp finished_adding_seconds
-
-max_time:
-	ldi r21, 99
-	sts Time, r21
-	sts Time+1, r21
 
 finished_adding_seconds:
-	pop r22
 	pop r21
 	pop r20 
 	jmp main		
@@ -472,14 +462,12 @@ in_power_state:
     cpi pattern, 4    
     brlo p1 ; less than 4
 
-	pop r24
     pop r16
     ret ; invalid input, polling to read next input
 p1:
     cpi pattern, 1 
     brsh p2 ; greater than or equal to 1
-    pop r24
-	pop r16
+    pop r16
     ret ; invalid input, polling to read next input
 p2:
     mov power,pattern
@@ -498,6 +486,7 @@ exitPowerState:
 cancel_operation:
 	push r20
 	push r24
+	push r16
 	clr r20
 	sts Buffer, r20
 	sts Buffer+1, r20
@@ -507,8 +496,11 @@ cancel_operation:
 	set_bit status, 0
 	do_lcd_command 0b00000010;cursorhome
 	do_lcd_command 0b00000001;clear display
+	ldi r16,'c'
+	do_lcd_data
 	ldi r24,1
 	rcall Display_OC
+	pop r16
 	pop r24
 	pop r20
 	rjmp main
@@ -1073,7 +1065,6 @@ one_second_less:
 	cpi r26, 0 ; if there are 0 seconds then the timer has now 59 seconds and one minute less
 	breq one_minute_less
 	dec r26 ; otherwise just decrease the seconds
-	sts Time+1, r26
 	rcall Display_Time
 	ldi r24, 255 ; all power modes the motor starts off spinning
 	rcall Motor_Spin
@@ -1082,8 +1073,6 @@ one_second_less:
 one_minute_less:
 	dec r27
 	ldi r26, 59
-	sts Time+1, r26
-	sts Time, r27
 	rcall Display_Time
 	ldi r24, 255 ; all power modes the motor starts off spinning
 	rcall Motor_Spin
@@ -1096,10 +1085,10 @@ cooking_finished:
 	rcall Clear_LED
 	rcall Motor_Spin
 	rcall Display_Finished_Mode
-	sts Time+1, r26
-	sts Time, r27
 
 finish_one_second_less:
+	sts Time+1, r26
+	sts Time, r27
 	pop temp
 	pop r27
 	pop r26
