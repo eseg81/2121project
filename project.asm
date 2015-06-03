@@ -20,6 +20,7 @@
 				  ; bit 4 set when door open (0 when closed), bit 5 set when in power level
 				  ; bit 6 set when the turntable rotates clockwise, 0 anticlockwise
 .def debouncing = r29;1 when key is entered
+.def old_status = r4
 .def last_turntable_char = r25
 
 .macro is_digit ; checks if the value in pattern is a digit between 0-9
@@ -95,6 +96,7 @@ RESET:
 	sts DDRL,temp
 	ldi temp,0xEF
 	sts PORTL,temp
+
 	clr status
 	set_bit status, 0 ; start off in entry mode with door closed
 	
@@ -176,6 +178,7 @@ main:
 colloop:
 	cpi col,4 ; if got to col 4, start scanning again from col 0
 	breq update_character
+	ori cmask,0x0F
 	sts PORTL,cmask ; give the current column low signal 
 	ldi temp,255
 delay:
@@ -329,8 +332,6 @@ cancel_operation_jump:
 	rjmp cancel_operation
 
 pause:
-	ldi r16,'p'
-	do_lcd_data
 	ldi r24,0;stopping the motor
 	rcall Motor_Spin
 	clear_bit status, 1 ; leave running mode
@@ -461,12 +462,13 @@ in_power_state:
     breq exitPowerState
     cpi pattern, 4    
     brlo p1 ; less than 4
-
+	pop r24
     pop r16
     ret ; invalid input, polling to read next input
 p1:
     cpi pattern, 1 
     brsh p2 ; greater than or equal to 1
+	pop r24
     pop r16
     ret ; invalid input, polling to read next input
 p2:
@@ -490,14 +492,14 @@ cancel_operation:
 	clr r20
 	sts Buffer, r20
 	sts Buffer+1, r20
+	sts Buffer+2,r20
+	sts Buffer+3,r20
 	sts Time, r20
 	sts Time+1, r20
 	clear_bit status, 2
 	set_bit status, 0
 	do_lcd_command 0b00000010;cursorhome
 	do_lcd_command 0b00000001;clear display
-	ldi r16,'c'
-	do_lcd_data
 	ldi r24,1
 	rcall Display_OC
 	pop r16
@@ -988,6 +990,8 @@ TIMER_OVF0:
 	sbrs status, 1 ; if not in running mode then just return
 	reti
 	push r24
+	in r24, SREG
+	push r24
 	push r26
 	push r27
 	push temp
@@ -1048,6 +1052,8 @@ finish_timer_interrupt:
 	pop temp
 	pop r27
 	pop r26
+	pop r24
+	out SREG, r24
 	pop r24
 	reti
 
@@ -1138,7 +1144,9 @@ finish_rotating:
 	pop r24
 	ret
 
-EXIT_INT0:
+EXIT_INT1:
+	sbrc status, 4
+	reti
 	push r18
 	push r24
 	rcall sleep_5ms
@@ -1162,6 +1170,8 @@ EXIT_INT0:
 	out EIFR,r18
 	ldi r24, 0
 	rcall Display_OC
+
+	mov old_status, status
 	set_bit status, 4 ; the door is open
 	sbrc status, 1 ; if in running mode then pause
 	rjmp enter_pause
@@ -1172,6 +1182,9 @@ EXIT_INT0:
 enter_pause:
 	clear_bit status, 1 
 	set_bit status, 2 ; entering pause mode
+	ldi r24,0
+	rcall Motor_Spin
+	rcall Clear_LED
 	rjmp return_from_push
 
 enter_entry:
@@ -1182,7 +1195,9 @@ enter_entry:
 	rcall Display_OC
 	rjmp return_from_push	
 
-EXIT_INT1:
+EXIT_INT0:
+	sbrs status, 4
+	reti
 	push r18
 	push r24
 	rcall sleep_5ms
@@ -1204,7 +1219,9 @@ EXIT_INT1:
 	in r18,EIFR;clearing bouncing
 	cbr r18,1
 	out EIFR,r18
+	mov status, old_status
 	clear_bit status, 4 ; the door is closed
+
 	ldi r24, 1
 	rcall Display_OC
 
