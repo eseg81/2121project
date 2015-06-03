@@ -22,6 +22,9 @@
 .def debouncing = r29;1 when key is entered
 .def old_status = r4
 .def last_turntable_char = r25
+.def sixteen = r6
+.def counter = r7
+.def back_lit_value = r13
 
 .macro is_digit ; checks if the value in pattern is a digit between 0-9
 	push temp
@@ -84,6 +87,8 @@ end:
 	jmp EXIT_INT0
 .org INT1addr
 	jmp EXIT_INT1
+.org OVF2addr ; timer overflow for back lit
+	jmp TIMER_OVF2
 .org OVF0addr ; timer interrupt
 	jmp TIMER_OVF0
 
@@ -113,14 +118,17 @@ RESET:
 	ldi temp, (1<< WGM30)|(1<<COM3B1)
 	sts TCCR3A, temp
 
-	//set up phase correct PWM mode for back light
-/*	clr temp
-	sts OCR5BL,temp
-	sts OCR5BH,temp
-	ldi temp, (1 << CS50)
-	sts TCCR5B, temp
-	ldi temp, (1<< WGM50)|(1<<COM5B1)
-	sts TCCR5A, temp*/
+	//set up phase correct PWM mode for back light(output compare)
+	ldi temp,255
+	sts OCR3AL,temp
+	clr temp
+	sts OCR3AH,temp
+	lds temp,TCCR3B
+	ori temp, (1 << CS30)
+	sts TCCR3B, temp
+	lds temp,TCCR3A
+	ori temp, (1<< WGM30)|(1<<COM3A1)
+	sts TCCR3A, temp
 	
 	//setup ports for keypad and LED
 	ser temp
@@ -143,9 +151,11 @@ RESET:
 	// setting up the timer interrupt every 128us
 	ldi temp, 0b00000000
 	out TCCR0A, temp 
+	sts TCCR2A, temp
 	ldi temp, 0b00000010
 	out TCCR0B, temp
-	ldi temp, 1<<TOIE0 
+	sts TCCR2B, temp
+	ldi temp, 1<<TOIE0
 	sts TIMSK0, temp 
 
 	//information reset
@@ -168,6 +178,9 @@ RESET:
 	ldi r24, 1 ; start off displaying closed door 
 	rcall Display_OC
 	
+	ldi temp,16
+	mov sixteen,temp
+	clr counter
 	ldi temp,0
 	mov index,temp
 	ldi debouncing,0
@@ -850,42 +863,6 @@ Motor_Spin:
 	pop temp
 	ret
 
-Back_Light_On:
-	push temp
-	ldi temp,255
-	sts OCR5BL,temp
-	clr temp
-	sts OCR5BH,temp
-	pop temp
-	ret
-
-Back_Light_Off:
-	push temp
-	ldi temp,0
-	sts OCR5BL,temp
-	clr temp
-	sts OCR5BH,temp
-	pop temp
-	ret
-
-Back_Light_Fade:
-	push temp
-	ldi temp,250
-comparing_intensity:
-	cpi temp,0
-	brsh light
-finished:
-	clr temp
-	sts OCR5BH,temp
-	pop temp
-	ret
-light:
-	sts OCR5BL,temp
-	dec temp
-	rcall sleep_1ms
-	rcall sleep_1ms
-	rjmp comparing_intensity
-
 Display_Buffer:
 	push r16 ;do_lcd_data register
 	push r17 ;'0' offset
@@ -1063,7 +1040,7 @@ one_second:
 	inc r26
 	cpi r26, 10
 	brne not_ten
-	//rcall ;;;;;;
+	rcall back_light_fading
 clear_seconds:
 	clr r26
 	sts Seconds, r26
@@ -1308,14 +1285,66 @@ Clear_LED:
 	pop r17
 	ret
 
+TIMER_OVF2:
+	push r16
+	in r16,sreg
+	push r16
+	push r26
+	push r27
+	push r24
+	inc counter
+	lds r27,Tempcounter+1
+	lds r26,Tempcounter
+	adiw r27:r26,1
+	cpi r26,low(3906)
+	ldi r24,high(3906)
+	cpc r27,r24
+	breq stopping_ovf1
+	sts Tempcounter+1,r27
+	sts Tempcounter,r26
+	cp counter,sixteen
+	brne return_from_ovf1
+	clr counter
+	dec back_lit_value
+	sts OCR3AL,back_lit_value
+return_from_ovf1:
+	pop r24
+	pop r27
+	pop r26
+	pop r16
+	out sreg,r16
+	pop r16
+	reti
+
+stopping_ovf1:
+	clr temp
+	sts TIMSK2, temp 
+	rjmp return_from_ovf1
+
+back_light_fading:
+	push r18
+	push r19
+	clr r18
+	sts Tempcounter,r18
+	sts Tempcounter+1,r18
+	ser r19
+	mov back_lit_value,r19
+	sts OCR3AL,r19
+	ldi r18,1 << TOIE2
+	sts TIMSK2, r18 
+	pop r19
+	pop r18
+	ret
 .dseg
 Buffer:
 	.byte 4 ; holding the four values entered
 Time:
 	.byte 2 ; format:"xx:xx",minutes:seconds
 Timecounter:
-	.byte 2 ; storing the amount of timer interrupts
+	.byte 2 ; storing the amount of timer0 interrupts
 Halfseconds:
 	.byte 1
 Seconds:
 	.byte 1
+Tempcounter:
+	.byte 2 ; storing the amount of timer1 interrupts
