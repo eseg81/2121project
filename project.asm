@@ -1054,6 +1054,20 @@ five_halfseconds:
 
 one_second:
 	rcall one_second_less ; the timer has one second less
+	cpi debouncing, 0
+	brne clear_seconds
+	lds r26, Seconds
+	inc r26
+	cpi r26, 10
+	brne not_ten
+	rcall ;;;;;;
+clear_seconds:
+	clr r26
+	sts Seconds, r26
+	rjmp continue_with_second
+not_ten:
+	sts Seconds, r26
+continue_with_second:	
 	clr r26
 	clr r27
 	lds temp, Halfseconds
@@ -1299,4 +1313,6 @@ Time:
 Timecounter:
 	.byte 2 ; storing the amount of timer interrupts
 Halfseconds:
+	.byte 1
+Seconds:
 	.byte 1
