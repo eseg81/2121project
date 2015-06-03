@@ -472,12 +472,14 @@ in_power_state:
     cpi pattern, 4    
     brlo p1 ; less than 4
 
+	pop r24
     pop r16
     ret ; invalid input, polling to read next input
 p1:
     cpi pattern, 1 
     brsh p2 ; greater than or equal to 1
-    pop r16
+    pop r24
+	pop r16
     ret ; invalid input, polling to read next input
 p2:
     mov power,pattern
