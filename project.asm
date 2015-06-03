@@ -127,7 +127,10 @@ RESET:
 	out DDRF,temp;For keypad
 	out DDRA,temp;For control of the display
 	out DDRC,temp;for LED
+	ldi temp,0b00001000
+	out DDRD,temp
 	clr temp
+	out PORTD,temp
 	out PORTF,temp
 	out PORTA,temp
 	out PORTC,temp
@@ -155,9 +158,9 @@ RESET:
 	sts Time+1,temp
 	sts Halfseconds, temp
 
+	//external interrupt setup
 	ldi temp,(2 << ISC00 | 2 << ISC10);setting mode falling edge
 	sts EICRA,temp
-
 	in temp,EIMSK
 	ori temp,(1 << INT0 | 1 << INT1)
 	out EIMSK,temp   ;enable external interrupt 0 and 1
@@ -1060,7 +1063,7 @@ one_second:
 	inc r26
 	cpi r26, 10
 	brne not_ten
-	rcall ;;;;;;
+	//rcall ;;;;;;
 clear_seconds:
 	clr r26
 	sts Seconds, r26
@@ -1203,9 +1206,9 @@ EXIT_INT1:
 	ldi r24, 0
 	rcall Display_OC
 
-	in r24,PORTA
-	ori r24,0b11110000
-	out PORTA,r24
+	in r24,PORTD
+	ori r24,0b00001000
+	out PORTD,r24
 	mov old_status, status
 	set_bit status, 4 ; the door is open
 	sbrc status, 1 ; if in running mode then pause
@@ -1260,9 +1263,9 @@ EXIT_INT0:
 
 	ldi r24, 1
 	rcall Display_OC
-	in r24,PORTA
-	andi r24,0b00001111
-	out PORTA,r24
+	in r24,PORTD
+	andi r24,0b11110111
+	out PORTD,r24
 
 return_from_push:
 	pop r24
