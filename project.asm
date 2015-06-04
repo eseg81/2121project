@@ -516,7 +516,6 @@ exitPowerState:
     clear_bit status,5
 	do_lcd_command 0b00000001;clear display
 	ldi r24,1
-	mov power,r24
 	rcall display_OC
 	pop r24
     pop r16
