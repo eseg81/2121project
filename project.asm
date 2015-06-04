@@ -1063,7 +1063,7 @@ finished_six:
 	sts Seconds_finished, r27
 	rjmp continue_with_second
 microseconds_in_finished:
-	lds r26, Seconds_not_running
+	lds r26, Seconds_finished
 	cpi r26, 6
 	brge continue_after_microseconds
 	sbrc r26, 0
@@ -1449,6 +1449,24 @@ turn_on_backlight:
 	pop r18
 	pop temp
 	ret
+
+Beep:
+	push r19
+	push r17
+	ldi r17, 255
+	cp speaker,r17
+	brne clrit
+	ser r19
+	sts OCR3CL,r19
+	rjmp exiting_Beep
+clrit:
+	clr r19
+	sts OCR3CL,r19
+exiting_Beep:
+	pop r17
+	pop r19
+	ret
+
 .dseg
 Buffer:
 	.byte 4 ; holding the four values entered
@@ -1468,4 +1486,3 @@ Seconds_finished:
 	.byte 1
 Microseconds:
 	.byte 1
-
