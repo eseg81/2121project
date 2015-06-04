@@ -1342,6 +1342,9 @@ EXIT_INT0:
 	in r24,PORTD
 	andi r24,0b11110111
 	out PORTD,r24
+	
+	sbrc status,3
+	rjmp back_to_entry
 
 return_from_push:
 	pop r24
@@ -1350,6 +1353,10 @@ return_from_push:
 	pop r18
 	reti
 
+back_to_entry:
+	clear_bit status,3
+	set_bit status,0
+	rjmp return_from_push
 Display_LED:
 	push r18
 	push r17
