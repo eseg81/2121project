@@ -167,6 +167,10 @@ RESET:
 	sts Time,temp
 	sts Time+1,temp
 	sts Halfseconds, temp
+	sts Seconds_not_running, temp
+	sts Timecounter_not_running, temp
+	sts Timecounter_not_running+1, temp
+
 
 	//external interrupt setup
 	ldi temp,(2 << ISC00 | 2 << ISC10);setting mode falling edge
@@ -980,9 +984,51 @@ return4:
     pop r16
     ret
 
+not_running_timer:
+	cpi debouncing, 0
+	brne clear_seconds
+	push r24
+	in r24, SREG
+	push r24
+	push r26
+	push r27
+	lds r26, Timecounter_not_running 
+	lds r27, Timecounter_not_running+1
+	adiw r27:r26, 1
+	cpi r26, low(7812) ; this is 1s
+	ldi r24, high(7812)
+	cpc r27, r24
+	brne not_second
+	clr r26
+	sts Timecounter_not_running, r26
+	sts Timecounter_not_running+1, r27
+	lds r26, Seconds_not_running
+	inc r26
+	cpi r26, 10
+	brne not_ten
+	rcall back_light_fading
+clear_seconds:
+	clr r26
+	sts Seconds_not_running, r26
+	rjmp finish_not_running_timer
+not_ten:
+	sts Seconds_not_running, r26
+	rjmp finish_not_running_timer
+not_second:
+	sts Timecounter_not_running, r26
+	sts Timecounter_not_running+1, r27
+finish_not_running_timer:	
+	pop r27
+	pop r26
+	pop r24
+	out SREG, r24
+	pop r24
+	reti
+	
+
 TIMER_OVF0:
 	sbrs status, 1 ; if not in running mode then just return
-	reti
+	rjmp not_running_timer
 	push r24
 	in r24, SREG
 	push r24
@@ -1034,20 +1080,6 @@ five_halfseconds:
 
 one_second:
 	rcall one_second_less ; the timer has one second less
-	cpi debouncing, 0
-	brne clear_seconds
-	lds r26, Seconds
-	inc r26
-	cpi r26, 10
-	brne not_ten
-	rcall back_light_fading
-clear_seconds:
-	clr r26
-	sts Seconds, r26
-	rjmp continue_with_second
-not_ten:
-	sts Seconds, r26
-continue_with_second:	
 	clr r26
 	clr r27
 	lds temp, Halfseconds
@@ -1344,7 +1376,11 @@ Timecounter:
 	.byte 2 ; storing the amount of timer0 interrupts
 Halfseconds:
 	.byte 1
-Seconds:
+Seconds_not_running:
 	.byte 1
 Tempcounter:
 	.byte 2 ; storing the amount of timer1 interrupts
+Timecounter_not_running:
+	.byte 2
+
+
