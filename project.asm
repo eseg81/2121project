@@ -170,6 +170,8 @@ RESET:
 	sts Seconds_not_running, temp
 	sts Timecounter_not_running, temp
 	sts Timecounter_not_running+1, temp
+	sts Tempcounter+1,temp
+	sts Tempcounter,temp
 
 
 	//external interrupt setup
@@ -278,6 +280,7 @@ zero:
 	rjmp main
 
 continue:
+	rcall turn_on_backlight
 	rjmp act_on_input
 
 act_on_input: ; deals with the key entered on the keypad
@@ -513,6 +516,7 @@ exitPowerState:
     clear_bit status,5
 	do_lcd_command 0b00000001;clear display
 	ldi r24,1
+	mov power,r24
 	rcall display_OC
 	pop r24
     pop r16
@@ -542,15 +546,25 @@ cancel_operation:
 	rjmp main
 	
 clear_entered:
-	push temp
-	clr temp
-	sts Buffer,temp
-	sts Buffer+1,temp
-	sts Buffer+2,temp
-	sts Buffer+3,temp
-    sts Time+1,temp
-    sts Time,temp
-	pop temp
+	push r20
+	push r24
+	push r16
+	clr r20
+	sts Buffer, r20
+	sts Buffer+1, r20
+	sts Buffer+2,r20
+	sts Buffer+3,r20
+	mov index,r20
+	sts Time, r20
+	sts Time+1, r20
+	do_lcd_command 0b00000010;cursorhome
+	do_lcd_command 0b00000001;clear display
+	ldi r24,1
+	rcall Display_OC
+	rcall Clear_LED
+	pop r16
+	pop r24
+	pop r20
 	rjmp main
 
 entering_time:	
@@ -985,13 +999,13 @@ return4:
     ret
 
 not_running_timer:
-	cpi debouncing, 0
-	brne clear_seconds
 	push r24
 	in r24, SREG
 	push r24
 	push r26
 	push r27
+	cpi debouncing, 0
+	brne clear_seconds
 	lds r26, Timecounter_not_running 
 	lds r27, Timecounter_not_running+1
 	adiw r27:r26, 1
@@ -1001,7 +1015,7 @@ not_running_timer:
 	brne not_second
 	clr r26
 	sts Timecounter_not_running, r26
-	sts Timecounter_not_running+1, r27
+	sts Timecounter_not_running+1, r26
 	lds r26, Seconds_not_running
 	inc r26
 	cpi r26, 10
@@ -1335,11 +1349,11 @@ TIMER_OVF2:
 	sts Tempcounter+1,r27
 	sts Tempcounter,r26
 	cp counter,sixteen
-	brne return_from_ovf1
+	brne return_from_ovf2
 	clr counter
 	dec back_lit_value
 	sts OCR3AL,back_lit_value
-return_from_ovf1:
+return_from_ovf2:
 	pop r24
 	pop r27
 	pop r26
@@ -1351,7 +1365,7 @@ return_from_ovf1:
 stopping_ovf1:
 	clr temp
 	sts TIMSK2, temp 
-	rjmp return_from_ovf1
+	rjmp return_from_ovf2
 
 back_light_fading:
 	push r18
@@ -1366,6 +1380,17 @@ back_light_fading:
 	sts TIMSK2, r18 
 	pop r19
 	pop r18
+	ret
+
+turn_on_backlight:
+	push temp
+	push r18
+	ldi r18,255
+	sts OCR3AL,r18
+	clr temp
+	sts TIMSK2, temp 
+	pop r18
+	pop temp
 	ret
 .dseg
 Buffer:
