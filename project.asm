@@ -517,13 +517,13 @@ in_power_state:
     brlo p1 ; less than 4
 	pop r24
     pop r16
-    ret ; invalid input, polling to read next input
+    jmp main ; invalid input, polling to read next input
 p1:
     cpi pattern, 1 
     brsh p2 ; greater than or equal to 1
 	pop r24
     pop r16
-    ret ; invalid input, polling to read next input
+    jmp main ; invalid input, polling to read next input
 p2:
     mov power,pattern
 	rcall clear_LED
@@ -581,6 +581,7 @@ clear_entered:
 	do_lcd_command 0b00000010;cursorhome
 	do_lcd_command 0b00000001;clear display
 	ldi r24,1
+	mov power,r24
 	rcall Display_OC
 	rcall Clear_LED
 	pop r16
