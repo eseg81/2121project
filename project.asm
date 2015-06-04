@@ -296,6 +296,7 @@ zero:
 
 continue:
 	rcall turn_on_backlight
+	rcall Beep_for_key
 	rjmp act_on_input
 
 act_on_input: ; deals with the key entered on the keypad
@@ -492,6 +493,7 @@ no_time_left:
 	rcall Motor_Spin
 	rcall Clear_LED
 	rcall Display_Finished_Mode
+	sts Seconds_finished, r24
 
 finished_subtracting_seconds:
 	pop r22
@@ -1467,6 +1469,28 @@ exiting_Beep:
 	pop r19
 	ret
 
+Beep_for_key:
+	push r17
+	push r18
+	push r19
+	ldi r19,125
+loop_for_beep:
+	cpi r19,0
+	breq exit_from_key_beep
+	clr r18
+	sts OCR3CL,r18
+	rcall sleep_1ms
+	ser r18
+	sts OCR3CL,r18
+	rcall sleep_1ms
+	dec r19
+	rjmp loop_for_beep
+exit_from_key_beep:
+	pop r19
+	pop r18
+	pop r17
+	ret
+	
 .dseg
 Buffer:
 	.byte 4 ; holding the four values entered
