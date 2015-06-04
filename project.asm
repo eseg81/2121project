@@ -1024,10 +1024,10 @@ not_running_timer:
 	clr r26
 	sts Timecounter_not_running, r26
 	sts Timecounter_not_running+1, r26
-	;lds r27, Seconds_finished
-	;inc r27 
-	;sbrc status, 3
-	;rjmp finished_six
+	lds r27, Seconds_finished
+	inc r27 
+	sbrc status, 3
+	rjmp finished_six
 continue_with_second:
 	lds r26, Seconds_not_running
 	inc r26
@@ -1041,12 +1041,12 @@ clear_seconds:
 not_ten:
 	sts Seconds_not_running, r26
 	rjmp finish_not_running_timer
-/*finished_six:
+finished_six:
 	cpi r27, 6
 	brge continue_with_second
 	; the code to enter for speaker
 	sts Seconds_finished, r27
-	rjmp continue_with_second*/
+	rjmp continue_with_second
 not_second:
 	sts Timecounter_not_running, r26
 	sts Timecounter_not_running+1, r27
