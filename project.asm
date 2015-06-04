@@ -26,6 +26,7 @@
 .def sixteen = r6
 .def counter = r7
 .def back_lit_value = r13
+.def speaker = r5
 
 .macro is_digit ; checks if the value in pattern is a digit between 0-9
 	push temp
@@ -183,9 +184,10 @@ RESET:
 	sts Tempcounter,temp
 	sts Tempcounter+1,temp
 	sts Seconds_finished, temp
-	
-	mov back_lit_value,temp 
+	sts Microseconds, temp	
 
+	mov back_lit_value,temp 
+	mov speaker, temp
 
 	//external interrupt setup
 	ldi temp,(2 << ISC00 | 2 << ISC10);setting mode falling edge
@@ -1023,14 +1025,18 @@ not_running_timer:
 	push r27
 	cpi debouncing, 0
 	brne clear_seconds
+	sbrc status, 3
+	rjmp microseconds_in_finished
+continue_after_microseconds:
 	lds r26, Timecounter_not_running 
 	lds r27, Timecounter_not_running+1
-	adiw r27:r26, 1
+	adiw r27:r26, 1 
 	cpi r26, low(7812) ; this is 1s
 	ldi r24, high(7812)
 	cpc r27, r24
 	brne not_second
 	clr r26
+	sts Microseconds, r26
 	sts Timecounter_not_running, r26
 	sts Timecounter_not_running+1, r26
 	lds r27, Seconds_finished
@@ -1056,6 +1062,22 @@ finished_six:
 	; the code to enter for speaker
 	sts Seconds_finished, r27
 	rjmp continue_with_second
+microseconds_in_finished:
+	lds r26, Seconds_not_running
+	cpi r26, 6
+	brge continue_after_microseconds
+	sbrc r26, 0
+	rjmp continue_after_microseconds 
+	lds r26, Microseconds
+	inc r26
+	sts Microseconds, r26
+	cpi r26, 8
+	brne continue_after_microseconds
+	com speaker
+	rcall Beep
+	clr r26
+	sts Microseconds, r26
+	rjmp continue_after_microseconds
 not_second:
 	sts Timecounter_not_running, r26
 	sts Timecounter_not_running+1, r27
@@ -1443,5 +1465,7 @@ Tempcounter:
 Timecounter_not_running:
 	.byte 2
 Seconds_finished:
+	.byte 1
+Microseconds:
 	.byte 1
 
