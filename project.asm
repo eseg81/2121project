@@ -445,7 +445,7 @@ add_thirty_seconds: ; adds 30 seconds to the cooking time
 adjust_minute_addition:
 	inc r21
 	sts Time, r21
-	subi r20, 60 ; since a minute is added, there is now 60 less seconds
+	subi r20, 100 
 	sts Time+1, r20
 	rjmp finished_adding_seconds
 
