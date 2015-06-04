@@ -3,7 +3,7 @@
 .equ LCD_E = 6
 .equ LCD_RW = 5
 .equ LCD_BE = 4
-.equ LCD_BL = 3;back light
+.equ LCD_BL = 3 ; back light
 .equ F_CPU = 16000000
 .equ DELAY_1MS = F_CPU / 4 / 1000 - 4
 .def index = r3
@@ -20,7 +20,7 @@
 				  ; bit 4 set when door open (0 when closed), bit 5 set when in power level
 				  ; bit 6 set when the turntable rotates clockwise, 0 anticlockwise
 				  ; bit 7 set when the LCD light is on, cleared when off
-.def debouncing = r29;1 when key is entered
+.def debouncing = r29 ; 1 when key is entered
 .def old_status = r4
 .def last_turntable_char = r25
 .def sixteen = r6
@@ -66,11 +66,9 @@ end:
 	sbi PORTA,@0
 .endmacro
 
-
 .macro lcd_clr
 	cbi PORTA,@0
 .endmacro
-
 
 .macro do_lcd_command
 	ldi r16,@0
@@ -86,78 +84,79 @@ end:
 .org 0x0000
 	jmp RESET
 .org INT0addr
-	jmp EXIT_INT0
+	jmp EXIT_INT0 ; push button interrupt
 .org INT1addr
-	jmp EXIT_INT1
-.org OVF2addr ; timer overflow for back lit
+	jmp EXIT_INT1 ; other push button interrupt
+.org OVF2addr ; timer overflow for back light
 	jmp TIMER_OVF2
 .org OVF0addr ; timer interrupt
 	jmp TIMER_OVF0
 
 RESET:
-	ldi temp,high(RAMEND) ; sets up the stack pointer
-	out SPH,temp
-	ldi temp,low(RAMEND)
-	out SPL,temp
-	ldi temp,0xF0 ; set the columns up for output, rows for input
-	sts DDRL,temp
-	ldi temp,0xEF
-	sts PORTL,temp
+	ldi temp, high(RAMEND) ; sets up the stack pointer
+	out SPH, temp
+	ldi temp, low(RAMEND)
+	out SPL, temp
+	ldi temp, 0xF0 ; set the columns up for output, rows for input
+	sts DDRL, temp
+	ldi temp, 0xEF
+	sts PORTL, temp
 
 	clr status
 	set_bit status, 0 ; start off in entry mode with door closed
 	
-	//set up pwm for motor. use timer3 for output compare match
+	// set up pwm for motor. use timer3 for output compare match
 	ser temp
-	out DDRE,temp
+	out DDRE, temp
 	clr temp
-	out PORTE,temp
-	sts OCR3BL,temp
-	sts OCR3BH,temp
-	//set up phase correct PWM mode
+	out PORTE, temp
+	sts OCR3BL, temp
+	sts OCR3BH, temp
+	// set up phase correct PWM mode
 	ldi temp, (1 << CS30)
 	sts TCCR3B, temp
 	ldi temp, (1<< WGM30)|(1<<COM3B1)
 	sts TCCR3A, temp
 
-	//set up phase correct PWM mode for back light(output compare)
+	// set up phase correct PWM mode for back light(output compare)
 	clr temp
-	sts OCR3AL,temp
-	sts OCR3AH,temp
-	lds temp,TCCR3B
+	sts OCR3AL, temp
+	sts OCR3AH, temp
+	lds temp, TCCR3B
 	ori temp, (1 << CS30)
 	sts TCCR3B, temp
-	lds temp,TCCR3A
+	lds temp, TCCR3A
 	ori temp, (1<< WGM30)|(1<<COM3A1)
 	sts TCCR3A, temp
 	
-	//set up speaker
+	// set up speaker
 	clr temp
-	sts OCR3CL,temp
-	sts OCR3CH,temp
-	lds temp,TCCR3C
+	sts OCR3CL, temp
+	sts OCR3CH, temp
+	lds temp, TCCR3C
 	ori temp, (1 << CS30)
 	sts TCCR3B, temp
 	lds temp, TCCR3A
 	ori temp, (1<< WGM30)|(1 <<COM3C1)
 	sts TCCR3a, temp
-	//setup ports for keypad and LED
+	
+	// setup ports for keypad and LED
 	ser temp
-	out DDRF,temp;For keypad
-	out DDRA,temp;For control of the display
-	out DDRC,temp;for LED
-	ldi temp,0b00001000
-	out DDRD,temp
+	out DDRF, temp ; for keypad
+	out DDRA, temp ; for control of the display
+	out DDRC, temp ; for LED
+	ldi temp, 0b00001000
+	out DDRD, temp
 	clr temp
-	out PORTD,temp
-	out PORTF,temp
-	out PORTA,temp
-	out PORTC,temp
-	do_lcd_command 0b00111000;setting format 2*5*7 lec notes 36
+	out PORTD, temp
+	out PORTF, temp
+	out PORTA, temp
+	out PORTC, temp
+	do_lcd_command 0b00111000 ; setting format 2*5*7 lec notes 36
 	do_lcd_command 0b00001101 ; Cursor on, bar, no blink, lecture notes 35
-	do_lcd_command 0b00000110;set entry mode
-	do_lcd_command 0b00000010;cursorhome
-	do_lcd_command 0b00000001;clear display
+	do_lcd_command 0b00000110 ; set entry mode
+	do_lcd_command 0b00000010 ; cursorhome
+	do_lcd_command 0b00000001 ; clear display
 
 	// setting up the timer interrupt every 128us
 	ldi temp, 0b00000000
@@ -169,73 +168,73 @@ RESET:
 	ldi temp, 1<<TOIE0
 	sts TIMSK0, temp 
 
-	//information reset
+	// information reset
 	clr temp
-	sts Buffer,temp
-	sts Buffer+1,temp
+	sts Buffer, temp
+	sts Buffer+1, temp
 	sts Buffer+2, temp
 	sts Buffer+3, temp
-	sts Time,temp
-	sts Time+1,temp
+	sts Time, temp
+	sts Time+1, temp
 	sts Halfseconds, temp
 	sts Seconds_not_running, temp
 	sts Timecounter_not_running, temp
 	sts Timecounter_not_running+1, temp
-	sts Tempcounter,temp
-	sts Tempcounter+1,temp
+	sts Tempcounter, temp
+	sts Tempcounter+1, temp
 	sts Seconds_finished, temp
 	sts Microseconds, temp	
 
-	mov back_lit_value,temp 
+	mov back_lit_value, temp 
 	mov speaker, temp
 
-	//external interrupt setup
-	ldi temp,(2 << ISC00 | 2 << ISC10);setting mode falling edge
-	sts EICRA,temp
-	in temp,EIMSK
-	ori temp,(1 << INT0 | 1 << INT1)
-	out EIMSK,temp   ;enable external interrupt 0 and 1
+	// external interrupt setup
+	ldi temp, (2 << ISC00 | 2 << ISC10);setting mode falling edge
+	sts EICRA, temp
+	in temp, EIMSK
+	ori temp, (1 << INT0 | 1 << INT1)
+	out EIMSK, temp   ;enable external interrupt 0 and 1
 	
 	ldi r24, 1 ; start off displaying closed door 
 	rcall Display_OC
 	
-	ldi temp,16
-	mov sixteen,temp
+	ldi temp, 16
+	mov sixteen, temp
 	clr counter
-	ldi temp,0
-	mov index,temp
-	ldi debouncing,0
+	ldi temp, 0
+	mov index, temp
+	ldi debouncing, 0
 	clr temp
 	sei
 
 main:
 	clr col
-	ldi cmask,0xEF ; start off with column 0 having low signal
+	ldi cmask, 0xEF ; start off with column 0 having low signal
 
 colloop:
-	cpi col,4 ; if got to col 4, start scanning again from col 0
+	cpi col, 4 ; if got to col 4, debounce then start scanning again from col 0
 	breq update_character
-	ori cmask,0x0F
-	sts PORTL,cmask ; give the current column low signal 
-	ldi temp,255
+	ori cmask, 0x0F
+	sts PORTL, cmask ; give the current column low signal 
+	ldi temp, 255
 delay:
-	cpi temp,0
+	cpi temp, 0
 	breq go_on
 	dec temp
 	rjmp delay
 go_on:
-	lds temp,PINL ; reads in the signals from PORT L
-	andi temp,0x0F ; isolate the input from the rows
-	cpi temp,0xF ; if all rows are low, proceed to next col
+	lds temp, PINL ; reads in the signals from PORT L
+	andi temp, 0x0F ; isolate the input from the rows
+	cpi temp, 0xF ; if all rows are low, proceed to next col
 	breq nextcol
 	clr row ; some row is low, need to determine which
-	ldi rmask,1 ; starting from row 07
+	ldi rmask, 1 ; starting from row 07
 
 rowloop:
-	cpi row,4
+	cpi row, 4
 	breq nextcol
-	mov temp2,temp
-	and temp2,rmask ; if the and results in 0 then the current row is low
+	mov temp2, temp
+	and temp2, rmask ; if the and results in 0 then the current row is low
 	breq convert
 	lsl rmask ; otherwise check the next row
 	inc row
@@ -247,13 +246,13 @@ nextcol:
 	rjmp colloop
 
 update_character:
-	cpi debouncing,1;key was pressed before
+	cpi debouncing, 1;key was pressed before
 	brne main
 	clr debouncing
 	rjmp continue
 
 convert: ; arrives here when a low signal has been found 	
-	ldi debouncing,1
+	ldi debouncing, 1
 	cpi col, 3 ; if its in col 3 then a letter is pressed
 	breq letters
 
@@ -264,15 +263,14 @@ convert: ; arrives here when a low signal has been found
 	mul row, temp ; this does 3 * row + col + 1
 	mov temp, R0 ; which finds out which number
 	inc temp ; is pressed
-	add temp,col
-	mov pattern,temp
-	
+	add temp, col
+	mov pattern, temp
 	rjmp main
 
 letters: ; find which letter pressed
 	ldi temp, 'A'
 	add temp, row
-	mov pattern,temp
+	mov pattern, temp
 	rjmp main
 
 symbols_or_0: ; find which symbol pressed, or if 0
@@ -281,17 +279,17 @@ symbols_or_0: ; find which symbol pressed, or if 0
 	cpi col, 1 ; col 1 is 0
 	breq zero
 	ldi temp, '#' ; otherwise it is #
-	mov pattern,temp
+	mov pattern, temp
 	rjmp main
 	
 star:
 	ldi temp, '*'
-	mov pattern,temp
+	mov pattern, temp
 	rjmp main
 	
 zero:
 	ldi temp, 0		 
-	mov pattern,temp
+	mov pattern, temp
 	rjmp main
 
 continue:
@@ -300,9 +298,9 @@ continue:
 	rjmp act_on_input
 
 act_on_input: ; deals with the key entered on the keypad
-	sbrc status,4;if door is opened,ignore
+	sbrc status, 4;if door is opened,ignore
 	rjmp main	   
-    sbrc status,5
+    sbrc status, 5
     rjmp in_power_state ; go to select power level
 	sbrc status, 0 ; deal differently with input depending what mode the microwave is in
 	rjmp in_entry_mode
@@ -371,7 +369,7 @@ cancel_operation_jump:
 	rjmp cancel_operation
 
 pause:
-	ldi r24,0;stopping the motor
+	ldi r24, 0 ; stopping the motor
 	rcall Motor_Spin
 	clear_bit status, 1 ; leave running mode
 	set_bit status, 2 ; enter paused mode
@@ -388,8 +386,8 @@ start_running:
 	eor status, temp ; it rotates anticlockwise now, otherwise it rotates clockwise
 	ldi r24, 2 ; start the turntable display
 	rcall Display_Turntable
-	ldi r17,0
-	cp index,r17
+	ldi r17, 0
+	cp index, r17
 	breq give_buffer_1min
 calling_transfer:
 	rcall Transfer_To_Time
@@ -399,16 +397,16 @@ calling_transfer:
 	rjmp main
 
 give_buffer_1min:
-	inc index;afte this index = 1
-	sts Buffer,index
+	inc index; after this index = 1
+	sts Buffer, index
 	inc index
-	inc index;index = 3
+	inc index ; index = 3
 	rjmp calling_transfer
 return_to_entry_mode:
 	clear_bit status, 3 ; leave finished mode
 	set_bit status, 0 ; enter entry mode
 	do_lcd_command 0b00000001;clear display
-	ldi r24,1;display closed state
+	ldi r24, 1 ; display closed state
 	rcall Display_OC
 	rjmp main
 
@@ -489,7 +487,7 @@ no_time_left:
 	set_bit status, 3 ; entering finished mode
 	ldi r24, 0 ; turn the motor off
 	sts Time, r24
-	sts Time+1,r24
+	sts Time+1, r24
 	rcall Motor_Spin
 	rcall Clear_LED
 	rcall Display_Finished_Mode
@@ -504,7 +502,7 @@ finished_subtracting_seconds:
 power_selection_state:	   
     push r16
 	rcall Display_Power_Text
-	set_bit status,5
+	set_bit status, 5
     pop r16
     jmp main
 
@@ -525,19 +523,19 @@ p1:
     pop r16
     ret ; invalid input, polling to read next input
 p2:
-    mov power,pattern
+    mov power, pattern
 	rcall clear_LED
 	rcall Display_LED
 
 exitPowerState:
-    clear_bit status,5
-	do_lcd_command 0b00000001;clear display
-	ldi r24,0
-	cp index,r24
+    clear_bit status, 5
+	do_lcd_command 0b00000001 ; clear display
+	ldi r24, 0
+	cp index, r24
 	breq continue_exiting
 	rcall Display_Buffer
 continue_exiting:
-	ldi r24,1
+	ldi r24, 1
 	rcall display_OC
 	pop r24
     pop r16
@@ -550,15 +548,15 @@ cancel_operation:
 	clr r20
 	sts Buffer, r20
 	sts Buffer+1, r20
-	sts Buffer+2,r20
-	sts Buffer+3,r20
+	sts Buffer+2, r20
+	sts Buffer+3, r20
 	sts Time, r20
 	sts Time+1, r20
 	clear_bit status, 2
 	set_bit status, 0
 	do_lcd_command 0b00000010;cursorhome
 	do_lcd_command 0b00000001;clear display
-	ldi r24,1
+	ldi r24, 1
 	rcall Display_OC
 	rcall Clear_LED
 	pop r16
@@ -573,14 +571,14 @@ clear_entered:
 	clr r20
 	sts Buffer, r20
 	sts Buffer+1, r20
-	sts Buffer+2,r20
-	sts Buffer+3,r20
-	mov index,r20
+	sts Buffer+2, r20
+	sts Buffer+3, r20
+	mov index, r20
 	sts Time, r20
 	sts Time+1, r20
-	do_lcd_command 0b00000010;cursorhome
-	do_lcd_command 0b00000001;clear display
-	ldi r24,1
+	do_lcd_command 0b00000010 ; cursorhome
+	do_lcd_command 0b00000001 ; clear display
+	ldi r24, 1
 	rcall Display_OC
 	rcall Clear_LED
 	pop r16
@@ -594,15 +592,15 @@ entering_time:
 	push temp
 	push ZL
 	push ZH
-	ldi r17,4
-	cp index,r17
-	breq return3 ;4digtis have been entered  
+	ldi r17, 4
+	cp index, r17
+	breq return3 ; 4digtis have been entered  
 	clr temp
-	ldi ZL,low(Buffer)
-	ldi ZH,high(Buffer)
-	add ZL,index
-	adc ZH,temp
-	st Z,pattern
+	ldi ZL, low(Buffer)
+	ldi ZH, high(Buffer)
+	add ZL, index
+	adc ZH, temp
+	st Z, pattern
 	inc index
 return3:
 	rcall Display_Buffer
@@ -614,16 +612,16 @@ return3:
 	jmp main
 
 lcd_command:
-	out PORTF,r16
+	out PORTF, r16
 	rcall sleep_1ms
-	lcd_set LCD_E ;
+	lcd_set LCD_E 
 	rcall sleep_1ms
 	lcd_clr LCD_E
 	rcall sleep_1ms
 	ret
 	
 lcd_data:
-	out PORTF,r16
+	out PORTF, r16
 	lcd_set LCD_RS
 	rcall sleep_1ms
 	lcd_set LCD_E
@@ -636,29 +634,29 @@ lcd_data:
 lcd_wait:
 	push r16
 	clr r16 ; changing portF to input port
-	out PORTF,r16
+	out PORTF, r16
 	lcd_set LCD_RW
 lcd_wait_loop:
 	rcall sleep_1ms
 	lcd_set LCD_E
 	rcall sleep_1ms
-	in r16,PINA
+	in r16, PINA
 	lcd_clr LCD_E; can we get rid of this line?
-	sbrc r16,7
+	sbrc r16, 7
 	rjmp lcd_wait_loop
 	lcd_clr LCD_RW
 	ser r16
-	out DDRF,r16
+	out DDRF, r16
 	pop r16
 	ret
 	
 sleep_1ms:
 	push XL
 	push XH
-	ldi XL,low(DELAY_1MS)
-	ldi XH,high(DELAY_1MS)
+	ldi XL, low(DELAY_1MS)
+	ldi XH, high(DELAY_1MS)
 loop:
-	sbiw XH:XL,1
+	sbiw XH:XL, 1
 	brne loop
 	pop XH
 	pop XL
@@ -675,7 +673,7 @@ sleep_5ms:
 Display_Finished_Mode:
 	push r16
 	push r24
-	do_lcd_command 0b00000001;clear display
+	do_lcd_command 0b00000001 ; clear display
 	do_lcd_command 0b00000010 ; cursor home
 	ldi r16, 'D'
 	do_lcd_data
@@ -715,40 +713,40 @@ Display_Finished_Mode:
 	pop r16
 	ret
 
-//call this function after setting the r24 to the corresponding 
-//value of the turntable you want
+// call this function after setting the r24 to the corresponding 
+// value of the turntable you want
 Display_Turntable:
 	push r16
 	push r21
 	do_lcd_command 0b00000010 ; cursor home
 	rcall move_cursor
 	mov last_turntable_char, r24
-	cpi r24,0;0=-
+	cpi r24, 0 ; 0 = -
 	breq display_0
-	cpi r24,1;1=\
+	cpi r24, 1 ; 1 = \
 	breq display_1
-	cpi r24,2;2=|
+	cpi r24, 2 ; 2 = |
 	breq display_2
-	cpi r24,3;3=/
+	cpi r24, 3 ; 3 = /
 	breq display_3
 	
 display_0:
-	ldi r16,45
+	ldi r16, 45
 	do_lcd_data
 	rjmp return_0
 
 display_1:
-	ldi r16,164
+	ldi r16, 164
 	do_lcd_data
 	rjmp return_0
 
 display_2:
-	ldi r16,124
+	ldi r16, 124
 	do_lcd_data
 	rjmp return_0
 
 display_3:
-	ldi r16,47
+	ldi r16, 47
 	do_lcd_data
 	rjmp return_0
 
@@ -762,13 +760,13 @@ Display_Time:
 	push r21
 	push XL
 	push XH
-	do_lcd_command 0b00000010;cursor home
-	lds XL,Time
+	do_lcd_command 0b00000010 ; cursor home
+	lds XL, Time
 	clr XH
 	rcall IntToA
-	ldi r16,':'
+	ldi r16, ':'
 	do_lcd_data 
-	lds XL,Time+1
+	lds XL, Time+1
 	clr XH
 	rcall IntToA
 	pop XH
@@ -777,36 +775,35 @@ Display_Time:
 	pop r16
 	ret
 
-//set r24 to the 0 for "O" ,1 for "C"
+// set r24 to the 0 for "O" ,1 for "C"
 Display_OC:
 	push r21
 	push r16
-
-	do_lcd_command 0b11000000;move to second line
+	do_lcd_command 0b11000000 ; move to second line
     rcall move_cursor
-	cpi r24,0
+	cpi r24, 0
 	breq set_to_O
-	ldi r16,'C'
+	ldi r16, 'C'
 	do_lcd_data
 	pop r16
 	pop r21
 	ret
 set_to_O:
-	ldi r16,'O'
+	ldi r16, 'O'
 	do_lcd_data 
 	pop r16
 	pop r21
 	ret
 
-//a function of moving the cursor to the right most position
-//on the display with the cursor stays at the beginning of any
-//line 
+// a function for moving the cursor to the right most position
+// on the display with the cursor staying at the beginning of any
+// line 
 move_cursor:
 	push r16
 	push r21
 	ldi r21,15
 moving:
-	cpi r21,0
+	cpi r21, 0
 	breq return_1
 	do_lcd_command 0b00010100;move cursor to right by 1
 	dec r21
@@ -855,24 +852,24 @@ IntToA:
 	push r16
 	push r19
 	push r20
-	push r21;hundred
-	push r22;tens
-	push r23;one
-	ldi r19,'0'
+	push r21 ; hundred
+	push r22 ; tens
+	push r23 ; one
+	ldi r19, '0'
 	clr r21
 	clr r22
 	clr r23
 ten:
-	cpi XL,10
+	cpi XL, 10
 	brsh addTens
-	mov r16,r22
-	add r16,r19;+'0'
+	mov r16, r22
+	add r16, r19 ; + '0'
 	do_lcd_data	
 one:
-	cpi XL,1
+	cpi XL, 1
 	brsh addOnes
-	mov r16,r23
-	add r16,r19;
+	mov r16, r23
+	add r16, r19;
 	do_lcd_data	
 	pop r23
 	pop r22
@@ -884,65 +881,65 @@ one:
 	
 addTens:
 	inc r22
-	subi XL,10
+	subi XL, 10
 	rjmp ten
 addOnes:
 	inc r23
-	subi XL,1
+	subi XL, 1
 	rjmp one
 
 
-//use r24 as parameter passed in this function
-//255:full speed;128:half speed;64:25% speed
+// use r24 as parameter passed in this function
+// 255:full speed;128:half speed;64:25% speed
 Motor_Spin:
 	push temp
-	sts OCR3BL,r24
+	sts OCR3BL, r24
 	clr temp
-	sts OCR3BH,temp
+	sts OCR3BH, temp
 	pop temp
 	ret
 
 Display_Buffer:
-	push r16 ;do_lcd_data register
-	push r17 ;'0' offset
-	push r18 ;store the value of index in order to print zero before digits
+	push r16 ; do_lcd_data register
+	push r17 ; '0' offset
+	push r18 ; store the value of index in order to print zero before digits
 	push r19 
-	push r20 ;print counter
-	push ZH ;pointer to digits in buffer
+	push r20 ; print counter
+	push ZH ; pointer to digits in buffer
 	push ZL
-	ldi r19,4
-	mov r18,index
-	ldi r17,'0'
+	ldi r19, 4
+	mov r18, index
+	ldi r17, '0'
 	clr r20
-	ldi ZH,high(Buffer)
-	ldi ZL,low(Buffer)
+	ldi ZH, high(Buffer)
+	ldi ZL, low(Buffer)
 	do_lcd_command 0b00000010 ;cursor home
 print_zero:	
-	cpi r18,4;digit entered and 4
+	cpi r18, 4;digit entered and 4
 	breq print_digits
-	mov r16,r17
+	mov r16, r17
 	do_lcd_data
 	inc r18
 	inc r20
-	cpi r20,2
+	cpi r20, 2
 	brne no_printing_colon
-	ldi r16,':'
+	ldi r16, ':'
 	do_lcd_data
 no_printing_colon:
 	rjmp print_zero
 
 print_digits:
-	ld r16,Z
-	add r16,r17
+	ld r16, Z
+	add r16, r17
 	do_lcd_data
 	inc r20
-	adiw ZH:ZL,1
-	cpi r20,2
+	adiw ZH:ZL, 1
+	cpi r20, 2
 	brne no_printing_colon_again
-	ldi r16,':'
+	ldi r16, ':'
 	do_lcd_data
 no_printing_colon_again:
-	cpi r20,4
+	cpi r20, 4
 	breq return5
 	rjmp print_digits		
 return5:
@@ -956,60 +953,57 @@ return5:
 	ret
 
 
-//Transfer values from Buffer to Time in data space
+// Transfer values from Buffer to Time in data space
 Transfer_To_Time:
 	push r16
-	push r17;index buffer
-    push r18;lower digit buffer
-    push r19;higher digit buffer
+	push r17 ; index buffer
+    push r18 ; lower digit buffer
+    push r19 ; higher digit buffer
 	clr r17
-	ldi r16,10
-	
-	mov r17,index
-	cpi r17,1
+	ldi r16, 10
+	mov r17, index
+	cpi r17, 1
 	breq one_digit
-	cpi r17,2
+	cpi r17, 2
 	breq two_digit
-	cpi r17,3
+	cpi r17, 3
 	breq three_digit
-	lds r19,Buffer
-	lds r18,Buffer+1
-	mul r19,r16
-	mov r19,r0
-	add r19,r18
-	sts Time,r19
-
-	lds r19,Buffer+2
-	lds r18,Buffer+3
-	mul r19,r16
-	mov r19,r0
-	add r19,r18
-	sts Time+1,r19
+	lds r19, Buffer
+	lds r18, Buffer+1
+	mul r19, r16
+	mov r19, r0
+	add r19, r18
+	sts Time, r19
+	lds r19, Buffer+2
+	lds r18, Buffer+3
+	mul r19, r16
+	mov r19, r0
+	add r19, r18
+	sts Time+1, r19
 	rjmp return4
 one_digit:
-	lds r19,Buffer
-	sts Time+1,r19
+	lds r19, Buffer
+	sts Time+1, r19
 	rjmp return4
 
 two_digit:
-    lds r19,Buffer
-    lds r18,Buffer+1
-    mul r19,r16
-    mov r19,r0;
-	add r19,r18
-    sts Time+1,r19
+    lds r19, Buffer
+    lds r18, Buffer+1
+    mul r19, r16
+    mov r19, r0
+	add r19, r18
+    sts Time+1, r19
 	rjmp return4
 
 three_digit:
-	lds r19,Buffer+1
-    lds r18,Buffer+2
-    mul r19,r16
-    mov r19,r0;
-	add r19,r18
-    sts Time+1,r19
-	
-	lds r19,Buffer
-	sts Time,r19
+	lds r19, Buffer+1
+    lds r18, Buffer+2
+    mul r19, r16
+    mov r19, r0
+	add r19, r18
+    sts Time+1, r19
+	lds r19, Buffer
+	sts Time, r19
 	rjmp return4
 return4:
 	clr index
@@ -1019,7 +1013,7 @@ return4:
     pop r16
     ret
 
-not_running_timer:
+not_running_timer: ; timer interrupt goes here when not in running mode
 	push r24
 	in r24, SREG
 	push r24
@@ -1028,7 +1022,7 @@ not_running_timer:
 	cpi debouncing, 0
 	brne clear_seconds
 	sbrc status, 3
-	rjmp microseconds_in_finished
+	rjmp microseconds_in_finished ; counting microseconds for speaker
 continue_after_microseconds:
 	lds r26, Timecounter_not_running 
 	lds r27, Timecounter_not_running+1
@@ -1061,7 +1055,6 @@ not_ten:
 finished_six:
 	cpi r27, 6
 	brge continue_with_second
-	; the code to enter for speaker
 	sts Seconds_finished, r27
 	rjmp continue_with_second
 microseconds_in_finished:
@@ -1091,9 +1084,8 @@ finish_not_running_timer:
 	pop r24
 	reti
 	
-
 TIMER_OVF0:
-	sbrs status, 1 ; if not in running mode then just return
+	sbrs status, 1 ; if not in running mode then go to different interrupt routine
 	rjmp not_running_timer
 	push r24
 	in r24, SREG
@@ -1210,7 +1202,8 @@ finish_one_second_less:
 	pop r24
 	ret	         
 
-rotate_turntable:
+// choose a new turntable character to display based on the last one
+rotate_turntable: 
 	push r24
 	sbrs status, 6 ; set if the turntable rotates clockwise
 	rjmp anti_clockwise
@@ -1276,15 +1269,15 @@ EXIT_INT1:
 	rcall sleep_5ms
 	rcall sleep_5ms
 	rcall sleep_5ms
-	in r18,EIFR;clearing bouncing
-	cbr r18,0
-	out EIFR,r18
+	in r18, EIFR ; clearing bouncing
+	cbr r18, 0
+	out EIFR, r18
 	ldi r24, 0
 	rcall Display_OC
 
-	in r24,PORTD
-	ori r24,0b00001000
-	out PORTD,r24
+	in r24, PORTD
+	ori r24, 0b00001000
+	out PORTD, r24
 	mov old_status, status
 	set_bit status, 4 ; the door is open
 	sbrc status, 1 ; if in running mode then pause
@@ -1296,14 +1289,14 @@ EXIT_INT1:
 enter_pause:
 	clear_bit status, 1 
 	set_bit status, 2 ; entering pause mode
-	ldi r24,0
+	ldi r24, 0
 	rcall Motor_Spin
 	rjmp return_from_push
 
 enter_entry:
 	clear_bit status, 3
 	set_bit status, 0 ; entering entry mode	
-	do_lcd_command 0b00000001;clear display
+	do_lcd_command 0b00000001 ; clear display
 	ldi r24, 0
 	rcall Display_OC
 	rjmp return_from_push	
@@ -1331,16 +1324,15 @@ EXIT_INT0:
 	rcall sleep_5ms
 	rcall sleep_5ms
 	rcall sleep_5ms
-	in r18,EIFR;clearing bouncing
-	cbr r18,1
-	out EIFR,r18
+	in r18, EIFR ; clearing bouncing
+	cbr r18, 1
+	out EIFR, r18
 	mov status, old_status
 	clear_bit status, 4 ; the door is closed
-
 	ldi r24, 1
 	rcall Display_OC
-	in r24,PORTD
-	andi r24,0b11110111
+	in r24, PORTD
+	andi r24, 0b11110111
 	out PORTD,r24
 
 return_from_push:
@@ -1353,12 +1345,12 @@ return_from_push:
 Display_LED:
 	push r18
 	push r17
-	cpi power,3
+	cpi power, 3
 	breq LED_1
-	cpi power,2
+	cpi power, 2
 	breq LED_2
 	ser r17
-	out PORTC,r17
+	out PORTC, r17
 
 return_LED:
 	pop r17
@@ -1366,46 +1358,46 @@ return_LED:
 	ret
 
 LED_1:
-	sbi PORTC,0
-	sbi PORTC,1
+	sbi PORTC, 0
+	sbi PORTC, 1
 	rjmp return_LED
 
 LED_2:
-	sbi PORTC,0
-	sbi PORTC,1
-	sbi PORTC,2
-	sbi PORTC,3
+	sbi PORTC, 0
+	sbi PORTC, 1
+	sbi PORTC, 2
+	sbi PORTC, 3
 	rjmp return_LED
 
 Clear_LED:
-	push  r17
+	push r17
 	clr r17
-	out PORTC,r17
+	out PORTC, r17
 	pop r17
 	ret
 
 TIMER_OVF2:
 	push r16
-	in r16,sreg
+	in r16, sreg
 	push r16
 	push r26
 	push r27
 	push r24
 	inc counter
-	lds r27,Tempcounter+1
-	lds r26,Tempcounter
-	adiw r27:r26,1
-	cpi r26,low(3906)
-	ldi r24,high(3906)
-	cpc r27,r24
+	lds r27, Tempcounter+1
+	lds r26, Tempcounter
+	adiw r27:r26, 1
+	cpi r26, low(3906)
+	ldi r24, high(3906)
+	cpc r27, r24
 	breq stopping_ovf1
-	sts Tempcounter+1,r27
-	sts Tempcounter,r26
-	cp counter,sixteen
+	sts Tempcounter+1, r27
+	sts Tempcounter, r26
+	cp counter, sixteen
 	brne return_from_ovf2
 	clr counter
 	dec back_lit_value
-	sts OCR3AL,back_lit_value
+	sts OCR3AL, back_lit_value
 return_from_ovf2:
 	pop r24
 	pop r27
@@ -1424,14 +1416,14 @@ back_light_fading:
 	push r18
 	push r19
 	clr r18
-	sts Tempcounter,r18
-	sts Tempcounter+1,r18
+	sts Tempcounter, r18
+	sts Tempcounter+1, r18
 	sbrs status, 7
 	rjmp finish_back_light_fading
 	ser r19
-	mov back_lit_value,r19
-	sts OCR3AL,r19
-	ldi r18,1 << TOIE2
+	mov back_lit_value, r19
+	sts OCR3AL, r19
+	ldi r18, 1 << TOIE2
 	sts TIMSK2, r18
 	clear_bit status, 7 ; the backlight is now off 
 finish_back_light_fading:
@@ -1442,9 +1434,9 @@ finish_back_light_fading:
 turn_on_backlight:
 	push temp
 	push r18
-	ldi r18,255
-	sts OCR3AL,r18
-	mov back_lit_value,r18
+	ldi r18, 255
+	sts OCR3AL, r18
+	mov back_lit_value, r18
 	clr temp
 	sts TIMSK2, temp
 	set_bit status, 7 ; the backlight is now on 
@@ -1456,14 +1448,14 @@ Beep:
 	push r19
 	push r17
 	ldi r17, 255
-	cp speaker,r17
+	cp speaker, r17
 	brne clrit
 	ser r19
-	sts OCR3CL,r19
+	sts OCR3CL, r19
 	rjmp exiting_Beep
 clrit:
 	clr r19
-	sts OCR3CL,r19
+	sts OCR3CL, r19
 exiting_Beep:
 	pop r17
 	pop r19
@@ -1473,15 +1465,15 @@ Beep_for_key:
 	push r17
 	push r18
 	push r19
-	ldi r19,125
+	ldi r19, 125
 loop_for_beep:
-	cpi r19,0
+	cpi r19, 0
 	breq exit_from_key_beep
 	clr r18
-	sts OCR3CL,r18
+	sts OCR3CL, r18
 	rcall sleep_1ms
 	ser r18
-	sts OCR3CL,r18
+	sts OCR3CL, r18
 	rcall sleep_1ms
 	dec r19
 	rjmp loop_for_beep
@@ -1506,7 +1498,7 @@ Tempcounter:
 	.byte 2 ; storing the amount of timer1 interrupts
 Timecounter_not_running:
 	.byte 2
-Seconds_finished:
+Seconds_finished: 
 	.byte 1
 Microseconds:
 	.byte 1
