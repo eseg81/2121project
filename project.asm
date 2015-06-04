@@ -167,6 +167,12 @@ RESET:
 	sts Time,temp
 	sts Time+1,temp
 	sts Halfseconds, temp
+	sts Seconds_not_running, temp
+	sts Timecounter_not_running, temp
+	sts Timecounter_not_running+1, temp
+	sts Tempcounter+1,temp
+	sts Tempcounter,temp
+
 
 	//external interrupt setup
 	ldi temp,(2 << ISC00 | 2 << ISC10);setting mode falling edge
@@ -274,6 +280,7 @@ zero:
 	rjmp main
 
 continue:
+	rcall turn_on_backlight
 	rjmp act_on_input
 
 act_on_input: ; deals with the key entered on the keypad
@@ -509,6 +516,7 @@ exitPowerState:
     clear_bit status,5
 	do_lcd_command 0b00000001;clear display
 	ldi r24,1
+	mov power,r24
 	rcall display_OC
 	pop r24
     pop r16
@@ -980,9 +988,51 @@ return4:
     pop r16
     ret
 
+not_running_timer:
+	push r24
+	in r24, SREG
+	push r24
+	push r26
+	push r27
+	cpi debouncing, 0
+	brne clear_seconds
+	lds r26, Timecounter_not_running 
+	lds r27, Timecounter_not_running+1
+	adiw r27:r26, 1
+	cpi r26, low(7812) ; this is 1s
+	ldi r24, high(7812)
+	cpc r27, r24
+	brne not_second
+	clr r26
+	sts Timecounter_not_running, r26
+	sts Timecounter_not_running+1, r26
+	lds r26, Seconds_not_running
+	inc r26
+	cpi r26, 10
+	brne not_ten
+	rcall back_light_fading
+clear_seconds:
+	clr r26
+	sts Seconds_not_running, r26
+	rjmp finish_not_running_timer
+not_ten:
+	sts Seconds_not_running, r26
+	rjmp finish_not_running_timer
+not_second:
+	sts Timecounter_not_running, r26
+	sts Timecounter_not_running+1, r27
+finish_not_running_timer:	
+	pop r27
+	pop r26
+	pop r24
+	out SREG, r24
+	pop r24
+	reti
+	
+
 TIMER_OVF0:
 	sbrs status, 1 ; if not in running mode then just return
-	reti
+	rjmp not_running_timer
 	push r24
 	in r24, SREG
 	push r24
@@ -1034,20 +1084,6 @@ five_halfseconds:
 
 one_second:
 	rcall one_second_less ; the timer has one second less
-	cpi debouncing, 0
-	brne clear_seconds
-	lds r26, Seconds
-	inc r26
-	cpi r26, 10
-	brne not_ten
-	rcall back_light_fading
-clear_seconds:
-	clr r26
-	sts Seconds, r26
-	rjmp continue_with_second
-not_ten:
-	sts Seconds, r26
-continue_with_second:	
 	clr r26
 	clr r27
 	lds temp, Halfseconds
@@ -1303,11 +1339,11 @@ TIMER_OVF2:
 	sts Tempcounter+1,r27
 	sts Tempcounter,r26
 	cp counter,sixteen
-	brne return_from_ovf1
+	brne return_from_ovf2
 	clr counter
 	dec back_lit_value
 	sts OCR3AL,back_lit_value
-return_from_ovf1:
+return_from_ovf2:
 	pop r24
 	pop r27
 	pop r26
@@ -1319,7 +1355,7 @@ return_from_ovf1:
 stopping_ovf1:
 	clr temp
 	sts TIMSK2, temp 
-	rjmp return_from_ovf1
+	rjmp return_from_ovf2
 
 back_light_fading:
 	push r18
@@ -1335,6 +1371,17 @@ back_light_fading:
 	pop r19
 	pop r18
 	ret
+
+turn_on_backlight:
+	push temp
+	push r18
+	ldi r18,255
+	sts OCR3AL,r18
+	clr temp
+	sts TIMSK2, temp 
+	pop r18
+	pop temp
+	ret
 .dseg
 Buffer:
 	.byte 4 ; holding the four values entered
@@ -1344,7 +1391,11 @@ Timecounter:
 	.byte 2 ; storing the amount of timer0 interrupts
 Halfseconds:
 	.byte 1
-Seconds:
+Seconds_not_running:
 	.byte 1
 Tempcounter:
 	.byte 2 ; storing the amount of timer1 interrupts
+Timecounter_not_running:
+	.byte 2
+
+
