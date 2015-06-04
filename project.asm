@@ -120,9 +120,8 @@ RESET:
 	sts TCCR3A, temp
 
 	//set up phase correct PWM mode for back light(output compare)
-	ldi temp,0
-	sts OCR3AL,temp
 	clr temp
+	sts OCR3AL,temp
 	sts OCR3AH,temp
 	lds temp,TCCR3B
 	ori temp, (1 << CS30)
@@ -131,6 +130,16 @@ RESET:
 	ori temp, (1<< WGM30)|(1<<COM3A1)
 	sts TCCR3A, temp
 	
+	//set up speaker
+	clr temp
+	sts OCR3CL,temp
+	sts OCR3CH,temp
+	lds temp,TCCR3C
+	ori temp, (1 << CS30)
+	sts TCCR3B, temp
+	lds temp, TCCR3A
+	ori temp, (1<< WGM30)|(1 <<COM3C1)
+	sts TCCR3a, temp
 	//setup ports for keypad and LED
 	ser temp
 	out DDRF,temp;For keypad
