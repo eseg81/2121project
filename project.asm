@@ -19,6 +19,7 @@
 				  ; bit 2 set when in paused mode, bit 3 set when in finished mode
 				  ; bit 4 set when door open (0 when closed), bit 5 set when in power level
 				  ; bit 6 set when the turntable rotates clockwise, 0 anticlockwise
+				  ; bit 7 set when the LCD light is on, cleared when off
 .def debouncing = r29;1 when key is entered
 .def old_status = r4
 .def last_turntable_char = r25
@@ -119,7 +120,7 @@ RESET:
 	sts TCCR3A, temp
 
 	//set up phase correct PWM mode for back light(output compare)
-	ldi temp,255
+	ldi temp,0
 	sts OCR3AL,temp
 	clr temp
 	sts OCR3AH,temp
@@ -170,8 +171,11 @@ RESET:
 	sts Seconds_not_running, temp
 	sts Timecounter_not_running, temp
 	sts Timecounter_not_running+1, temp
-	sts Tempcounter+1,temp
 	sts Tempcounter,temp
+	sts Tempcounter+1,temp
+	sts Seconds_finished, temp
+	
+	mov back_lit_value,temp 
 
 
 	//external interrupt setup
@@ -1015,6 +1019,11 @@ not_running_timer:
 	clr r26
 	sts Timecounter_not_running, r26
 	sts Timecounter_not_running+1, r26
+	;lds r27, Seconds_finished
+	;inc r27 
+	;sbrc status, 3
+	;rjmp finished_six
+continue_with_second:
 	lds r26, Seconds_not_running
 	inc r26
 	cpi r26, 10
@@ -1027,6 +1036,12 @@ clear_seconds:
 not_ten:
 	sts Seconds_not_running, r26
 	rjmp finish_not_running_timer
+/*finished_six:
+	cpi r27, 6
+	brge continue_with_second
+	; the code to enter for speaker
+	sts Seconds_finished, r27
+	rjmp continue_with_second*/
 not_second:
 	sts Timecounter_not_running, r26
 	sts Timecounter_not_running+1, r27
@@ -1146,6 +1161,7 @@ cooking_finished:
 	rcall Clear_LED
 	rcall Motor_Spin
 	rcall Display_Finished_Mode
+	sts Seconds_finished, r24 ; it has been finished for 0 seconds 
 
 finish_one_second_less:
 	sts Time+1, r26
@@ -1372,11 +1388,15 @@ back_light_fading:
 	clr r18
 	sts Tempcounter,r18
 	sts Tempcounter+1,r18
+	sbrs status, 7
+	rjmp finish_back_light_fading
 	ser r19
 	mov back_lit_value,r19
 	sts OCR3AL,r19
 	ldi r18,1 << TOIE2
-	sts TIMSK2, r18 
+	sts TIMSK2, r18
+	clear_bit status, 7 ; the backlight is now off 
+finish_back_light_fading:
 	pop r19
 	pop r18
 	ret
@@ -1386,8 +1406,10 @@ turn_on_backlight:
 	push r18
 	ldi r18,255
 	sts OCR3AL,r18
+	mov back_lit_value,r18
 	clr temp
-	sts TIMSK2, temp 
+	sts TIMSK2, temp
+	set_bit status, 7 ; the backlight is now on 
 	pop r18
 	pop temp
 	ret
@@ -1406,5 +1428,6 @@ Tempcounter:
 	.byte 2 ; storing the amount of timer1 interrupts
 Timecounter_not_running:
 	.byte 2
-
+Seconds_finished:
+	.byte 1
 
